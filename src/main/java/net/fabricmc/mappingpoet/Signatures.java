@@ -322,6 +322,10 @@ public final class Signatures {
 							String simpleName = signature.substring(innerNameStart, index);
 							if (ch == '.' || ch == ';') {
 								stack.tweakLast(name -> ((ParameterizedTypeName) name).nestedClass(simpleName));
+								if (ch == ';') {
+									index++;
+									break;
+								}
 							} else {
 								stack.push(Frame.ofGenericInnerClass((ParameterizedTypeName) stack.deque.getLast().typeNames.removeLast(), simpleName));
 								index++;

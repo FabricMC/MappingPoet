@@ -1,21 +1,38 @@
 package net.fabricmc.mappingpoet;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import javax.lang.model.element.Modifier;
+
 import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.MethodSpec;
+import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
-import net.fabricmc.mappings.EntryTriple;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import javax.lang.model.element.Modifier;
-import java.util.ArrayList;
-import java.util.List;
+import net.fabricmc.mappings.EntryTriple;
 
 public class MethodBuilder {
+	private static final Set<String> RESERVED_KEYWORDS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+			"abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue",
+			"default", "do", "double", "else", "enum", "extends", "final", "finally", "float", "for", "goto", "if",
+			"implements", "import", "instanceof", "int", "interface", "long", "native", "new", "package", "private",
+			"protected", "public", "return", "short", "static", "strictfp", "super", "switch", "synchronized", "this",
+			"throw", "throws", "transient", "try", "void", "volatile", "while"
+	)));
 	private final MappingsStore mappings;
 	private final ClassNode classNode;
 	private final MethodNode methodNode;
 	private final MethodSpec.Builder builder;
+
+	private Signatures.MethodSignature signature;
 
 	public MethodBuilder(MappingsStore mappings, ClassNode classNode, MethodNode methodNode) {
 		this.mappings = mappings;
@@ -25,6 +42,7 @@ public class MethodBuilder {
 		addJavaDoc();
 		setReturnType();
 		addParameters();
+		addExceptions();
 	}
 
 	private MethodSpec.Builder createBuilder() {
@@ -33,6 +51,14 @@ public class MethodBuilder {
 		if (methodNode.name.equals("<init>") || !java.lang.reflect.Modifier.isInterface(classNode.access)) {
 			builder.modifiers.remove(Modifier.DEFAULT);
 		}
+
+		if (methodNode.signature != null) {
+			signature = Signatures.parseMethodSignature(methodNode.signature);
+			if (signature.generics != null) {
+				builder.addTypeVariables(signature.generics);
+			}
+		}
+
 		return builder;
 	}
 
@@ -41,9 +67,15 @@ public class MethodBuilder {
 		if (methodNode.name.equals("<init>")) {
 			return;
 		}
+
+		if (signature != null) {
+			builder.returns(signature.result);
+			return;
+		}
+
 		String returnDesc = methodNode.desc.substring(methodNode.desc.lastIndexOf(")") + 1);
 
-		TypeName typeName = FieldBuilder.getFieldType(returnDesc);
+		TypeName typeName = FieldBuilder.typeFromDesc(returnDesc);
 		builder.returns(typeName);
 		if (typeName != TypeName.VOID && !builder.modifiers.contains(Modifier.ABSTRACT)) {
 			builder.addStatement("throw new RuntimeException()");
@@ -52,85 +84,134 @@ public class MethodBuilder {
 
 	private void addParameters() {
 		List<ParamType> paramTypes = new ArrayList<>();
-		getParams(methodNode.desc, paramTypes);
+		boolean instanceMethod = !builder.modifiers.contains(Modifier.STATIC);
+		if (signature != null) {
+			getGenericParams(paramTypes, instanceMethod);
+		} else {
+			getDescParams(paramTypes, instanceMethod);
+		}
 		for (ParamType paramType : paramTypes) {
-			builder.addParameter(paramType.type, paramType.name, paramType.modifiers);
+			ParameterSpec.Builder paramBuilder = ParameterSpec.builder(paramType.type, paramType.name, paramType.modifiers);
+			if (paramType.comment != null) {
+				paramBuilder.addJavadoc(paramType.comment);
+			}
+			builder.addParameter(paramBuilder.build());
 		}
 	}
 
-	//TODO this prob needs a rewrite
-	private void getParams(String desc, List<ParamType> paramTypes) {
-		if (desc.isEmpty() || desc.charAt(0) == ')') {
-			return;
+	private void getGenericParams(List<ParamType> paramTypes, boolean instance) {
+		Set<String> usedParamNames = new HashSet<>(RESERVED_KEYWORDS);
+		int slot = instance ? 1 : 0;
+		for (TypeName each : signature.parameters) {
+			paramTypes.add(new ParamType(mappings.getParamNameAndDoc(new EntryTriple(classNode.name, methodNode.name, methodNode.desc), slot), each, usedParamNames));
+			slot++;
+			if (each.equals(TypeName.DOUBLE) || each.equals(TypeName.LONG)) {
+				slot++;
+			}
 		}
-		if (desc.charAt(0) == '(') {
-			getParams(desc.substring(1), paramTypes);
-			return;
-		}
-		TypeName type = TypeName.VOID;
-
-		int width = 1;
-		char cha = desc.charAt(0);
-
-		switch (cha) {
-			case 'B':
-				type = TypeName.BYTE;
-				break;
-			case 'C':
-				type = TypeName.CHAR;
-				break;
-			case 'S':
-				type = TypeName.SHORT;
-				break;
-			case 'Z':
-				type = TypeName.BOOLEAN;
-				break;
-			case 'I':
-				type = TypeName.INT;
-				break;
-			case 'J':
-				type = TypeName.LONG;
-				break;
-			case 'F':
-				type = TypeName.FLOAT;
-				break;
-			case 'D':
-				type = TypeName.DOUBLE;
-				break;
-			case 'L' :
-				desc = desc.substring(1);
-				String clazz = desc.substring(0, desc.indexOf(";"));
-				width = clazz.length() + 1;
-				type = ClassBuilder.getClassName(clazz);
-		}
-
-		paramTypes.add(new ParamType(mappings.getParamName(new EntryTriple(classNode.name, methodNode.name, methodNode.desc), paramTypes.size() + 1), type, paramTypes.size()));
-		getParams(desc.substring(width), paramTypes);
 	}
 
-	private class ParamType {
+	private void getDescParams(List<ParamType> paramTypes, boolean instance) {
+		Set<String> usedParamNames = new HashSet<>(RESERVED_KEYWORDS);
+		int slot = instance ? 1 : 0;
+		final String desc = methodNode.desc;
+		int index = 0;
+
+		if (desc.charAt(index) != '(') {
+			throw invalidMethodDesc(desc, index);
+		}
+		index++; // consume '('
+
+		while (desc.charAt(index) != ')') {
+			Map.Entry<Integer, TypeName> parsedParam = FieldBuilder.parseType(desc, index);
+			index = parsedParam.getKey();
+			TypeName paramType = parsedParam.getValue();
+
+			paramTypes.add(new ParamType(mappings.getParamNameAndDoc(new EntryTriple(classNode.name, methodNode.name, methodNode.desc), slot), paramType, usedParamNames));
+			slot++;
+			if (paramType.equals(TypeName.DOUBLE) || paramType.equals(TypeName.LONG)) {
+				slot++;
+			}
+		}
+		/* bruh, we don't care about return type
+		index++; // consume ')'
+		Map.Entry<Integer, TypeName> parsedReturn = FieldBuilder.parseType(desc, index);
+		index = parsedReturn.getKey();
+		TypeName returnType = parsedReturn.getValue();
+		 */
+	}
+
+	private static IllegalArgumentException invalidMethodDesc(String desc, int index) {
+		return new IllegalArgumentException(String.format("Invalid method descriptor at %d: \"%s\"", index, desc));
+	}
+
+	private static class ParamType {
 		private final String name;
 		private final TypeName type;
 		private final Modifier[] modifiers;
+		final String comment;
 
-		public ParamType(String name, TypeName type, int index) {
-			this.name = name != null ? name : getValidName(type) + "_" + index;
+		public ParamType(Map.Entry<String, String> nameAndDoc, TypeName type, Set<String> usedNames) {
+			this.name = nameAndDoc != null ? nameAndDoc.getKey() : generateValidName(suggestName(type), usedNames);
+			usedNames.add(this.name);
+			this.comment = nameAndDoc == null ? null : nameAndDoc.getValue();
 			this.type = type;
 			this.modifiers = new ModifierBuilder(0)
 					.getModifiers(ModifierBuilder.Type.PARAM);
 		}
-
-		private String getValidName(TypeName type) {
-			String str = type.toString();
-			if (str.contains(".")) {
-				str = str.substring(str.lastIndexOf(".") + 1);
+		
+		private static String generateValidName(String suggestedName, Set<String> usedNames) {
+			if (!usedNames.contains(suggestedName)) {
+				return suggestedName;
 			}
-			str = Character.toLowerCase(str.charAt(0)) + str.substring(1);
+			int t = 2;
+			String currentSuggestion = suggestedName + t;
+			while (usedNames.contains(currentSuggestion)) {
+				t++;
+				currentSuggestion = suggestedName + t;
+			}
+			
+			return currentSuggestion;
+		}
+
+		private static String suggestName(TypeName type) {
+			String str = type.toString();
+			int newStart = 0;
+			int newEnd = str.length();
+			int ltStart;
+			ltStart = str.indexOf('<', newStart);
+			if (ltStart != -1 && ltStart < newEnd) {
+				newEnd = ltStart;
+			}
+			ltStart = str.indexOf('[', newStart);
+			if (ltStart != -1 && ltStart < newEnd) {
+				newEnd = ltStart;
+			}
+			int dotEnd;
+			if ((dotEnd = str.lastIndexOf(".", newEnd)) != -1) {
+				newStart = dotEnd + 1;
+			}
+			str = Character.toLowerCase(str.charAt(newStart)) + str.substring(newStart + 1, newEnd);
 
 			if (str.equals("boolean")) {
 				str = "bool";
 			}
 			return str;
+		}
+	}
+
+	private void addExceptions() {
+		if (signature != null) {
+			for (TypeName each : signature.thrown) {
+				builder.addException(each);
+			}
+			return;
+		}
+		List<String> exceptions = methodNode.exceptions;
+		if (exceptions != null) {
+			for (String internalName : exceptions) {
+				builder.addException(ClassBuilder.parseInternalName(internalName));
+			}
 		}
 	}
 
@@ -141,30 +222,31 @@ public class MethodBuilder {
 		}
 	}
 
+	@Deprecated // use FieldBuilder.parseType non recursive version
 	private TypeName getFieldType(String desc) {
 		switch (desc) {
-			case "B":
-				return TypeName.BYTE;
-			case "C":
-				return TypeName.CHAR;
-			case "S":
-				return TypeName.SHORT;
-			case "Z":
-				return TypeName.BOOLEAN;
-			case "I":
-				return TypeName.INT;
-			case "J":
-				return TypeName.LONG;
-			case "F":
-				return TypeName.FLOAT;
-			case "D":
-				return TypeName.DOUBLE;
+		case "B":
+			return TypeName.BYTE;
+		case "C":
+			return TypeName.CHAR;
+		case "S":
+			return TypeName.SHORT;
+		case "Z":
+			return TypeName.BOOLEAN;
+		case "I":
+			return TypeName.INT;
+		case "J":
+			return TypeName.LONG;
+		case "F":
+			return TypeName.FLOAT;
+		case "D":
+			return TypeName.DOUBLE;
 		}
 		if (desc.startsWith("[")) {
 			return ArrayTypeName.of(getFieldType(desc.substring(1)));
 		}
 		if (desc.startsWith("L")) {
-			return ClassBuilder.getClassName(desc.substring(1).substring(0, desc.length() -2));
+			return ClassBuilder.getClassName(desc.substring(1).substring(0, desc.length() - 2));
 		}
 		throw new UnsupportedOperationException("Unknown field type" + desc);
 	}

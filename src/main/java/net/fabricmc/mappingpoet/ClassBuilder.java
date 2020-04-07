@@ -19,6 +19,8 @@ public class ClassBuilder {
 
 	private final TypeSpec.Builder builder;
 	private final List<ClassBuilder> innerClasses = new ArrayList<>();
+	
+	private Signatures.ClassSignature signature;
 
 	public ClassBuilder(MappingsStore mappings, ClassNode classNode) {
 		this.mappings = mappings;
@@ -31,14 +33,21 @@ public class ClassBuilder {
 	}
 
 	private TypeSpec.Builder setupBuilder() {
+		if (classNode.signature != null) {
+			signature = Signatures.parseClassSignature(classNode.signature);
+		}
 		TypeSpec.Builder builder;
 		if (Modifier.isInterface(classNode.access)) {
 			builder = TypeSpec.interfaceBuilder(getClassName(classNode.name));
-		} else if (classNode.superName.equals("java.lang.Enum")) {
+		} else if (classNode.superName.equals("java/lang/Enum")) {
 			builder = TypeSpec.enumBuilder(getClassName(classNode.name));
 		} else {
 			builder = TypeSpec.classBuilder(getClassName(classNode.name))
-					.superclass(getClassName(classNode.superName));
+					.superclass(signature == null ? getClassName(classNode.superName) : signature.superclass);
+		}
+		
+		if (signature != null && signature.generics != null) {
+			builder.addTypeVariables(signature.generics);
 		}
 
 		return builder
@@ -46,6 +55,10 @@ public class ClassBuilder {
 	}
 
 	private void addInterfaces() {
+		if (signature != null) {
+			builder.addSuperinterfaces(signature.superinterfaces);
+			return;
+		}
 		if (classNode.interfaces == null) return;
 
 		for (String iFace :classNode.interfaces){
@@ -69,7 +82,15 @@ public class ClassBuilder {
 	private void addFields() {
 		if (classNode.fields == null) return;
 		for (FieldNode field : classNode.fields) {
-			builder.addField(new FieldBuilder(mappings, classNode, field).build());
+			if ((field.access & Opcodes.ACC_SYNTHETIC) != 0)
+				continue; // hide synthetic stuff
+			if ((field.access & Opcodes.ACC_ENUM)  == 0) {
+				builder.addField(new FieldBuilder(mappings, classNode, field).build());
+			} else {
+				TypeSpec.Builder enumBuilder = TypeSpec.anonymousClassBuilder("");
+				FieldBuilder.addFieldJavaDoc(enumBuilder, mappings, classNode, field);
+				builder.addEnumConstant(field.name, enumBuilder.build());
+			}
 		}
 	}
 	
@@ -96,7 +117,44 @@ public class ClassBuilder {
 				.forEach(builder::addType);
 		return builder.build();
 	}
+	
+	public static ClassName parseInternalName(String internalName) {
+		int classNameSeparator = -1;
+		int index = 0;
+		int nameStart = index;
+		ClassName currentClassName = null;
 
+		char ch;
+		do {
+			ch = index == internalName.length() ? ';' : internalName.charAt(index);
+
+			if (ch == '$' || ch == ';') {
+				// collect class name
+				if (currentClassName == null) {
+					String packageName = nameStart < classNameSeparator ? internalName.substring(nameStart, classNameSeparator).replace('/', '.') : "";
+					String simpleName = internalName.substring(classNameSeparator + 1, index);
+					currentClassName = ClassName.get(packageName, simpleName);
+				} else {
+					String simpleName = internalName.substring(classNameSeparator + 1, index);
+					currentClassName = currentClassName.nestedClass(simpleName);
+				}
+			}
+
+			if (ch == '/' || ch == '$') {
+				// Start of simple name
+				classNameSeparator = index;
+			}
+
+			index++;
+		} while (ch != ';');
+
+		if (currentClassName == null)
+			throw new IllegalArgumentException(String.format("Invalid internal name \"%s\"", internalName));
+		
+		return currentClassName;
+	}
+
+	@Deprecated // Use parseInternalName, less allocations
 	public static ClassName getClassName(String input) {
 		int lastDelim = input.lastIndexOf("/");
 		String packageName = input.substring(0, lastDelim).replaceAll("/", ".");

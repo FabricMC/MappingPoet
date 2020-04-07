@@ -105,29 +105,36 @@ public class Main {
 		//Sort all the classes making sure that inner classes come after the parent classes
 		classes.sort(Comparator.comparing(o -> o.name));
 
-		classes.forEach(classNodeConsumer::accept);
+		classes.forEach(classNodeConsumer);
+	}
+	
+	private static boolean isDigit(char ch) {
+		return ch >= '0' && ch <= '9';
 	}
 
 	private static void writeClass(MappingsStore mappings, ClassNode classNode, Map<String, ClassBuilder> existingClasses) {
-		try {
-			//Awful code to skip anonymous classes
-			Integer.parseInt(classNode.name.substring(classNode.name.lastIndexOf('$') + 1));
-			return;
-		} catch (Exception e) {
-			//Nope all good if this fails
+		String name = classNode.name;
+		{
+			//Block anonymous class and their nested classes
+			int lastSearch = name.length();
+			while (lastSearch != -1) {
+				lastSearch = name.lastIndexOf('$', lastSearch - 1);
+				if (isDigit(name.charAt(lastSearch + 1))) // names starting with digit is illegal java
+					return;
+			}
 		}
 
 		ClassBuilder classBuilder = new ClassBuilder(mappings, classNode);
 
-		if (classNode.name.contains("$")) {
-			String parentClass = classNode.name.substring(0, classNode.name.lastIndexOf("$"));
+		if (name.contains("$")) {
+			String parentClass = name.substring(0, name.lastIndexOf("$"));
 			if (!existingClasses.containsKey(parentClass)) {
 				throw new RuntimeException("Could not find parent class: " + parentClass + " for " + classNode.name);
 			}
 			existingClasses.get(parentClass).addInnerClass(classBuilder);
 		}
 
-		existingClasses.put(classNode.name, classBuilder);
+		existingClasses.put(name, classBuilder);
 
 	}
 

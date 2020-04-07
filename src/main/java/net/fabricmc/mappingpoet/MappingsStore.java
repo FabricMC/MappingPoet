@@ -12,6 +12,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +53,7 @@ public class MappingsStore {
 		return fieldDef != null ? fieldDef.getComment() : null;
 	}
 
-	public String getParamName(EntryTriple methodEntry, int index) {
+	public Map.Entry<String, String> getParamNameAndDoc(EntryTriple methodEntry, int index) {
 		MethodDef methodDef = methods.get(methodEntry);
 		if (methodDef != null) {
 			if (methodDef.getParameters().isEmpty()) {
@@ -60,7 +61,7 @@ public class MappingsStore {
 			}
 			return methodDef.getParameters().stream()
 					.filter(param -> param.getLocalVariableIndex() == index)
-					.map(param -> param.getName(namespace))
+					.map(param -> new AbstractMap.SimpleImmutableEntry<>(param.getName(namespace), param.getComment()))
 					.findFirst()
 					.orElse(null);
 		}

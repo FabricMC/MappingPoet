@@ -13,6 +13,7 @@ import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeVariableName;
+import com.squareup.javapoet.WildcardTypeName;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -131,5 +132,19 @@ public class SignaturesTest {
 		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(headCheckerClass, TypeVariableName.get("E"))), parsed.parameters);
 		Assertions.assertEquals(TypeName.VOID, parsed.result);
 		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("E")), parsed.thrown);
+	}
+
+	@Test
+	public void testBrokenVariantSettingSignature() {
+		// Ljava/util/Map<Lnet/minecraft/data/client/model/VariantSetting<*>;Lnet/minecraft/data/client/model/VariantSetting<*>.Value;>;
+		String signature = "Ljava/util/Map<Lnet/minecraft/data/client/model/VariantSetting<*>;Lnet/minecraft/data/client/model/VariantSetting<*>.Value;>;";
+		Map.Entry<Integer, TypeName> parsed = Signatures.parseParameterizedType(signature, 0);
+		Assertions.assertEquals(125, parsed.getKey().intValue());
+		ClassName variantSettingClass = ClassName.get("net.minecraft.data.client.model", "VariantSetting");
+		ParameterizedTypeName wildcardVariantSetting = ParameterizedTypeName.get(variantSettingClass, WildcardTypeName.subtypeOf(TypeName.OBJECT));
+		ParameterizedTypeName valueClass = wildcardVariantSetting.nestedClass("Value");
+		ClassName mapClass = ClassName.get(Map.class);
+		ParameterizedTypeName genericMap = ParameterizedTypeName.get(mapClass, wildcardVariantSetting, valueClass);
+		Assertions.assertEquals(genericMap, parsed.getValue());
 	}
 }
