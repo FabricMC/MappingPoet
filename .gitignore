@@ -12,3 +12,6 @@
 !/gradlew
 !/gradlew.bat
 !/settings.gradle
+!/LICENSE
+!/HEADER
+!/Jenkinsfile

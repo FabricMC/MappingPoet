@@ -1,11 +1,15 @@
 plugins {
     id 'java'
+    id 'maven-publish'
 }
 
 group 'net.fabricmc'
 version '0.1.0'
 
 sourceCompatibility = 1.8
+
+def ENV = System.getenv()
+version = version + "+" + (ENV.BUILD_NUMBER ? ("build." + ENV.BUILD_NUMBER) : "local")
 
 repositories {
     mavenCentral()
@@ -32,4 +36,35 @@ dependencies {
 
 test {
     useJUnitPlatform()
+}
+
+jar {
+    manifest {
+        attributes 'Implementation-Title': 'MappingPoet',
+                'Implementation-Version': version,
+                'Main-Class': "net.fabricmc.mappingpoet.Main"
+    }
+}
+
+apply from: 'https://github.com/FabricMC/fabric-docs/raw/master/gradle/license.gradle'
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+
+    // select the repositories you want to publish to
+    repositories {
+        if (project.hasProperty('mavenPass')) {
+            maven {
+                url = "http://mavenupload.modmuss50.me/"
+                credentials {
+                    username = "buildslave"
+                    password = project.getProperty('mavenPass')
+                }
+            }
+        }
+    }
 }
