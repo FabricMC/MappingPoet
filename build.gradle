@@ -1,6 +1,5 @@
 plugins {
     id 'java'
-    id 'com.github.johnrengelman.shadow' version '5.2.0'
 }
 
 group 'net.fabricmc'
@@ -34,5 +33,3 @@ dependencies {
 test {
     useJUnitPlatform()
 }
-
-tasks.assemble.dependsOn shadowJar
