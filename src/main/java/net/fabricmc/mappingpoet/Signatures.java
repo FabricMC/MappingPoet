@@ -1,13 +1,11 @@
 package net.fabricmc.mappingpoet;
 
 import java.util.AbstractMap;
-import java.util.Arrays;
 import java.util.Deque;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.ClassName;
@@ -18,10 +16,8 @@ import com.squareup.javapoet.WildcardTypeName;
 
 public final class Signatures {
 
-	public static Map.Entry<Integer, TypeName> parseParameterizedType(String signature, int startOffset) {
-		Deque<Frame<?>> frames = new LinkedList<>();
-		Deque<LinkedList<TypeParameterEntry<?>>> typeParametersStack = new LinkedList<>();
-		typeParametersStack.addLast(new LinkedList<>());
+	public static Map.Entry<Integer, TypeName> parseParameterizedType(final String signature, final int startOffset) {
+		GenericStack stack = new GenericStack();
 
 		int index = startOffset;
 		// the loop parses a type and try to quit levels if possible
@@ -35,7 +31,7 @@ public final class Signatures {
 			case '*': {
 				index++;
 				parseExactType = false;
-				typeParametersStack.getLast().add(TypeParameterEntry.wildcard());
+				stack.addWildcard();
 				break;
 			}
 			case '+': {
@@ -73,7 +69,7 @@ public final class Signatures {
 				case 'S':
 				case 'Z': {
 					// primitives
-					typeParametersStack.getLast().add(new TypeParameterEntry<>(getPrimitive(ch), arrayLevel, bounded, extendsBound));
+					stack.add(getPrimitive(ch), arrayLevel, bounded, extendsBound);
 					break;
 				}
 				case 'T': {
@@ -83,7 +79,7 @@ public final class Signatures {
 						index++;
 					}
 					String typeVarName = signature.substring(nameStart, index);
-					typeParametersStack.getLast().add(new TypeParameterEntry<>(TypeVariableName.get(typeVarName), arrayLevel, bounded, extendsBound));
+					stack.add(TypeVariableName.get(typeVarName), arrayLevel, bounded, extendsBound);
 					index++; // read ending ";"
 					break;
 				}
@@ -121,12 +117,11 @@ public final class Signatures {
 
 					assert currentClass != null;
 					if (ch == ';') {
-						typeParametersStack.getLast().add(new TypeParameterEntry<>(currentClass, arrayLevel, bounded, extendsBound));
+						stack.add(currentClass, arrayLevel, bounded, extendsBound);
 					}
 
 					if (ch == '<') {
-						typeParametersStack.addLast(new LinkedList<>());
-						frames.addLast(Frame.ofClass(new TypeParameterEntry<>(currentClass, arrayLevel, bounded, extendsBound)));
+						stack.push(Frame.ofClass(currentClass), arrayLevel, bounded, extendsBound);
 					}
 					break;
 				}
@@ -138,10 +133,9 @@ public final class Signatures {
 
 			// quit generics
 			quitLoop:
-			while (!frames.isEmpty() && signature.charAt(index) == '>') {
+			while (stack.canQuit() && signature.charAt(index) == '>') {
 				// pop
-				TypeParameterEntry<?> genericElement = frames.removeLast().acceptParameters(typeParametersStack.removeLast());
-				typeParametersStack.getLast().add(genericElement);
+				stack.popFrame();
 				index++;
 
 				// followups like .B<E> in A<T>.B<E>
@@ -151,22 +145,21 @@ public final class Signatures {
 					}
 					index++;
 					int innerNameStart = index;
-					TypeParameterEntry<?> modTarget = typeParametersStack.getLast().removeLast();
-					if (!(modTarget.typeName instanceof ParameterizedTypeName)) {
-						throw errorAt(signature, index);
-					}
-					@SuppressWarnings("unchecked")
-					TypeParameterEntry<ParameterizedTypeName> enclosing = (TypeParameterEntry<ParameterizedTypeName>) modTarget;
+					final int checkIndex = index;
+					stack.checkHead(head -> {
+						if (!(head instanceof ParameterizedTypeName)) {
+							throw errorAt(signature, checkIndex);
+						}
+					});
 
 					while (true) {
 						ch = signature.charAt(index);
 						if (ch == '.' || ch == ';' || ch == '<') {
 							String simpleName = signature.substring(innerNameStart, index);
 							if (ch == '.' || ch == ';') {
-								enclosing = enclosing.map(name -> name.nestedClass(simpleName));
+								stack.tweakLast(name -> ((ParameterizedTypeName) name).nestedClass(simpleName));
 							} else {
-								frames.addLast(Frame.ofGenericInnerClass(enclosing, simpleName));
-								typeParametersStack.addLast(new LinkedList<>());
+								stack.push(Frame.ofGenericInnerClass((ParameterizedTypeName) stack.deque.getLast().typeNames.removeLast(), simpleName));
 								index++;
 								break quitLoop;
 							}
@@ -180,12 +173,11 @@ public final class Signatures {
 
 			}
 
-			assert frames.size() == typeParametersStack.size() - 1;
-		} while (frames.size() > 0);
+		} while (stack.canQuit());
 
-		assert typeParametersStack.size() == 1;
-		assert typeParametersStack.getLast().size() == 1;
-		return new AbstractMap.SimpleImmutableEntry<>(index, typeParametersStack.getLast().get(0).resolve());
+		assert stack.deque.size() == 1;
+		assert stack.deque.getLast().typeNames.size() == 1;
+		return new AbstractMap.SimpleImmutableEntry<>(index, stack.collectFrame());
 	}
 
 	private static IllegalArgumentException errorAt(String signature, int index) {
@@ -226,51 +218,111 @@ public final class Signatures {
 
 	@FunctionalInterface
 	interface Frame<T extends TypeName> {
-		static Frame<ParameterizedTypeName> ofClass(TypeParameterEntry<ClassName> classNameEntry) {
-			return parameters -> classNameEntry.map(name -> ParameterizedTypeName.get(name, parameters));
+		static Frame<ParameterizedTypeName> ofClass(ClassName className) {
+			return parameters -> ParameterizedTypeName.get(className, parameters.toArray(new TypeName[0]));
 		}
 
-		static Frame<ParameterizedTypeName> ofGenericInnerClass(TypeParameterEntry<ParameterizedTypeName> outerClassEntry, String innerName) {
-			return parameters -> outerClassEntry.map(name -> name.nestedClass(innerName, Arrays.asList(parameters)));
+		static Frame<ParameterizedTypeName> ofGenericInnerClass(ParameterizedTypeName outerClass, String innerName) {
+			return parameters -> outerClass.nestedClass(innerName, parameters);
 		}
 		
-		default TypeParameterEntry<T> acceptParameters(List<TypeParameterEntry<?>> superParameters) {
-			TypeName[] typeNames = new TypeName[superParameters.size()];
-			int len = typeNames.length;
-			Iterator<TypeParameterEntry<?>> itr = superParameters.iterator();
-			for (int i = 0; i < len; i++) {
-				typeNames[i] = itr.next().resolve();
-			}
-			return acceptParameters(typeNames);
+		static Frame<TypeName> collecting() {
+			return parameters -> {
+				if (parameters.size() != 1)
+					throw new IllegalStateException();
+				return parameters.get(0);
+			};
 		}
 
-		TypeParameterEntry<T> acceptParameters(TypeName[] parameters);
+		T acceptParameters(List<TypeName> parameters);
 	}
 
-	// exists so that [LA<TB;>.C<TD;>; get parsed as A<B>.C<D>[] than A<B>[].C<D>
-	static final class TypeParameterEntry<T extends TypeName> {
-		final T typeName;
-		final int arrayLevel;
-		final boolean bounded;
-		final boolean extendsBound;
-		
-		static TypeParameterEntry<WildcardTypeName> wildcard() {
-			return new TypeParameterEntry<>(WildcardTypeName.subtypeOf(ClassName.OBJECT), 0, false, false);
+	@FunctionalInterface
+	interface HeadChecker<E extends Throwable> {
+		void check(TypeName typeName) throws E;
+	}
+
+	static final class GenericStack {
+		private final Deque<Element> deque = new LinkedList<>();
+
+		GenericStack() {
+			deque.addLast(new Element(Frame.collecting()));
+		}
+
+		public boolean canQuit() {
+			return deque.size() > 1;
+		}
+
+		public void push(Frame<?> frame) {
+			deque.addLast(new Element(frame));
+		}
+
+		public void push(Frame<?> frame, int arrayLevel, boolean bounded, boolean extendsBound) {
+			deque.getLast().pushAttributes(arrayLevel, bounded, extendsBound);
+			push(frame);
+		}
+
+		public void addWildcard() {
+			add(WildcardTypeName.subtypeOf(ClassName.OBJECT), 0, false, false);
+		}
+
+		public void add(TypeName typeName, int arrayLevel, boolean bounded, boolean extendsBound) {
+			deque.getLast().add(typeName, arrayLevel, bounded, extendsBound);
+		}
+
+		public void tweakLast(UnaryOperator<TypeName> modifier) {
+			LinkedList<TypeName> typeNames = deque.getLast().typeNames;
+			typeNames.addLast(modifier.apply(typeNames.removeLast()));
 		}
 		
-		TypeParameterEntry(T typeName, int arrayLevel, boolean bounded, boolean extendsBound) {
-			this.typeName = typeName;
-			this.arrayLevel = arrayLevel;
-			this.bounded = bounded;
-			this.extendsBound = extendsBound;
+		public TypeName collectFrame() {
+			return deque.removeLast().pop();
 		}
-		
-		<U extends TypeName> TypeParameterEntry<U> map(Function<? super T, ? extends U> mapper) {
-			return new TypeParameterEntry<>(mapper.apply(typeName), arrayLevel, bounded, extendsBound);
+
+		public void popFrame() {
+			TypeName name = collectFrame();
+			deque.getLast().typeNames.addLast(name);
 		}
-		
-		TypeName resolve() {
-			return Signatures.wrap(typeName, arrayLevel, bounded, extendsBound);
+
+		public <E extends Throwable> void checkHead(HeadChecker<E> checker) throws E {
+			checker.check(deque.getLast().typeNames.getLast());
+		}
+
+		private static final class Element {
+			final LinkedList<TypeName> typeNames;
+			final Frame<?> frame;
+			int arrayLevel = 0;
+			boolean bounded = false;
+			boolean extendsBound = false;
+
+			Element(Frame<?> frame) {
+				this.typeNames = new LinkedList<>();
+				this.frame = frame;
+			}
+
+			void add(TypeName typeName, int arrayLevel, boolean bounded, boolean extendsBound) {
+				pushAttributes(arrayLevel, bounded, extendsBound);
+				typeNames.addLast(typeName);
+			}
+
+			private void updateLast() {
+				if (!typeNames.isEmpty()) {
+					TypeName lastTypeName = typeNames.removeLast();
+					typeNames.addLast(Signatures.wrap(lastTypeName, this.arrayLevel, this.bounded, this.extendsBound));
+				}
+			}
+
+			void pushAttributes(int arrayLevel, boolean bounded, boolean extendsBound) {
+				updateLast();
+				this.arrayLevel = arrayLevel;
+				this.bounded = bounded;
+				this.extendsBound = extendsBound;
+			}
+
+			TypeName pop() {
+				updateLast();
+				return frame.acceptParameters(typeNames);
+			}
 		}
 	}
 }
