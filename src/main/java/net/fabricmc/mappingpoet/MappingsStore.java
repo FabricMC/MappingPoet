@@ -3,7 +3,6 @@ package net.fabricmc.mappingpoet;
 import net.fabricmc.mapping.tree.ClassDef;
 import net.fabricmc.mapping.tree.FieldDef;
 import net.fabricmc.mapping.tree.MethodDef;
-import net.fabricmc.mapping.tree.ParameterDef;
 import net.fabricmc.mapping.tree.TinyMappingFactory;
 import net.fabricmc.mapping.tree.TinyTree;
 import net.fabricmc.mappings.EntryTriple;
@@ -13,9 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.AbstractMap;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 //Taken from loom
@@ -72,33 +69,7 @@ public class MappingsStore {
 		MethodDef methodDef = methods.get(methodEntry);
 
 		if (methodDef != null) {
-			List<String> parts = new ArrayList<>();
-
-			if (methodDef.getComment() != null) {
-				parts.add(methodDef.getComment());
-			}
-
-			boolean addedParam = false;
-
-			for (ParameterDef param : methodDef.getParameters()) {
-				String comment = param.getComment();
-
-				if (comment != null) {
-					if (!addedParam && methodDef.getComment() != null) {
-						//Add a blank line before params when the method has a comment
-						parts.add("");
-						addedParam = true;
-					}
-
-					parts.add(String.format("@param %s %s", param.getName(namespace), comment));
-				}
-			}
-
-			if (parts.isEmpty()) {
-				return null;
-			}
-
-			return String.join("\n", parts);
+			return methodDef.getComment(); // comment doc handled separately by javapoet
 		}
 
 		return null;

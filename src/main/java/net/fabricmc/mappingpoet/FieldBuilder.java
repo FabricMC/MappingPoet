@@ -32,14 +32,15 @@ public class FieldBuilder {
 		FieldSpec.Builder ret = FieldSpec.builder(calculateType(), fieldNode.name)
 				.addModifiers(new ModifierBuilder(fieldNode.access).getModifiers(ModifierBuilder.Type.FIELD));
 
-		if ((fieldNode.access & Opcodes.ACC_STATIC) != 0) {
+		if ((fieldNode.access & Opcodes.ACC_FINAL) != 0) {
 			ret.initializer(makeInitializer(fieldNode.desc)); // so jd doesn't complain about type mismatch
 		}
 
 		return ret;
 	}
 
-	static String makeInitializer(String desc) {
+	private String makeInitializer(String desc) {
+		// fake initializers exclude fields from constant values
 		switch (desc.charAt(0)) {
 		case 'B':
 		case 'C':
@@ -48,11 +49,20 @@ public class FieldBuilder {
 		case 'I':
 		case 'J':
 		case 'S':
-			return "0";
+			if (fieldNode.value != null) {
+				return String.valueOf(fieldNode.value);
+			}
+			return "java.lang.Byte.parseByte(\"dummy\")";
 		case 'Z':
-			return "false";
+			if (fieldNode.value instanceof Number) {
+				return Boolean.toString(((Number) fieldNode.value).intValue() != 0);
+			}
+			return "java.lang.Boolean.parseBoolean(\"dummy\")";
 		}
-		return "null";
+		if (fieldNode.value != null) {
+			return String.valueOf(fieldNode.value);
+		}
+		return desc.equals("Ljava/lang/String;") ? "java.lang.String.valueOf(\"dummy\")" : "null";
 	}
 
 	static void addFieldJavaDoc(TypeSpec.Builder enumBuilder, MappingsStore mappings, ClassNode classNode, FieldNode fieldNode) {

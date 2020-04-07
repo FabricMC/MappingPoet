@@ -71,7 +71,7 @@ public class ClassBuilder {
 	private void addMethods() {
 		if (classNode.methods == null) return;
 		for (MethodNode method : classNode.methods) {
-			if ((method.access & Opcodes.ACC_SYNTHETIC) != 0) {
+			if ((method.access & Opcodes.ACC_SYNTHETIC) != 0 || (method.access & Opcodes.ACC_MANDATED) != 0) {
 				continue;
 			}
 			if (method.name.equals("<clinit>")) {
@@ -93,7 +93,7 @@ public class ClassBuilder {
 	private void addFields() {
 		if (classNode.fields == null) return;
 		for (FieldNode field : classNode.fields) {
-			if ((field.access & Opcodes.ACC_SYNTHETIC) != 0) {
+			if ((field.access & Opcodes.ACC_SYNTHETIC) != 0 || (field.access & Opcodes.ACC_MANDATED) != 0) {
 				continue; // hide synthetic stuff
 			}
 			if ((field.access & Opcodes.ACC_ENUM) == 0) {

@@ -67,14 +67,14 @@ public class MethodBuilder {
 			return;
 		}
 
+		TypeName typeName;
 		if (signature != null) {
-			builder.returns(signature.result);
-			return;
+			typeName = signature.result;
+		} else {
+			String returnDesc = methodNode.desc.substring(methodNode.desc.lastIndexOf(")") + 1);
+			typeName = FieldBuilder.typeFromDesc(returnDesc);
 		}
 
-		String returnDesc = methodNode.desc.substring(methodNode.desc.lastIndexOf(")") + 1);
-
-		TypeName typeName = FieldBuilder.typeFromDesc(returnDesc);
 		builder.returns(typeName);
 		if (typeName != TypeName.VOID && !builder.modifiers.contains(Modifier.ABSTRACT)) {
 			builder.addStatement("throw new RuntimeException()");
@@ -95,7 +95,7 @@ public class MethodBuilder {
 			paramType.fillName(usedParamNames);
 			ParameterSpec.Builder paramBuilder = ParameterSpec.builder(paramType.type, paramType.name, paramType.modifiers);
 			if (paramType.comment != null) {
-				paramBuilder.addJavadoc(paramType.comment);
+				paramBuilder.addJavadoc(paramType.comment + "\n");
 			}
 			builder.addParameter(paramBuilder.build());
 		}
