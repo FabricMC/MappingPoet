@@ -16,6 +16,170 @@ import com.squareup.javapoet.WildcardTypeName;
 
 public final class Signatures {
 
+	public static ClassSignature parseClassSignature(final String signature) {
+		// <A:Labc.Def:Ljava.util.Iterable<Ljava/lang.Object;>;B:Ljava/lang/Object>Ljava/lang/Object; etc etc
+		int index = 0;
+		char ch;
+		List<TypeVariableName> generics = null;
+		if (signature.charAt(0) == '<') {
+			// parse generic decl
+			index++; // consume '<'
+
+			// parse type params e.g. <A, B>
+			generics = new LinkedList<>();
+			while ((ch = signature.charAt(index)) != '>') {
+				int genericNameStart = index;
+				if (ch == ':') {
+					throw errorAt(signature, index);
+				}
+				do {
+					index++;
+				} while (signature.charAt(index) != ':');
+
+				String genericName = signature.substring(genericNameStart, index);
+
+				List<TypeName> bounds = new LinkedList<>();
+				boolean classBound = true;
+				while (signature.charAt(index) == ':') {
+					// parse bounds
+					index++; // consume ':'
+					if (classBound && signature.charAt(index) == ':') {
+						// No class bound, only interface bounds, so '::'
+						classBound = false;
+						continue;
+					}
+					classBound = false;
+					Map.Entry<Integer, TypeName> bound = parseParameterizedType(signature, index);
+					index = bound.getKey();
+					bounds.add(bound.getValue());
+				}
+
+				generics.add(TypeVariableName.get(genericName, bounds.toArray(new TypeName[0])));
+			}
+
+			index++; // consume '>'
+		}
+
+		LinkedList<TypeName> supers = new LinkedList<>();
+		while (index < signature.length()) {
+			Map.Entry<Integer, TypeName> bound = parseParameterizedType(signature, index);
+			index = bound.getKey();
+			supers.add(bound.getValue());
+		}
+
+		return new ClassSignature(generics, supers.removeFirst(), supers);
+	}
+
+	public static final class ClassSignature {
+		// Nullable
+		public final List<TypeVariableName> generics;
+		public final TypeName superclass;
+		public final List<TypeName> superinterfaces;
+
+		ClassSignature(List<TypeVariableName> generics, TypeName superclass, List<TypeName> superinterfaces) {
+			this.generics = generics;
+			this.superclass = superclass;
+			this.superinterfaces = superinterfaces;
+		}
+	}
+
+	public static MethodSignature parseMethodSignature(String signature) {
+		int index = 0;
+		char ch;
+		List<TypeVariableName> generics = null;
+		if (signature.charAt(0) == '<') {
+			// parse generic decl
+			index++; // consume '<'
+
+			// parse type params e.g. <A, B>
+			generics = new LinkedList<>();
+			while ((ch = signature.charAt(index)) != '>') {
+				int genericNameStart = index;
+				if (ch == ':') {
+					throw errorAt(signature, index);
+				}
+				do {
+					index++;
+				} while (signature.charAt(index) != ':');
+
+				String genericName = signature.substring(genericNameStart, index);
+
+				List<TypeName> bounds = new LinkedList<>();
+				boolean classBound = true;
+				while (signature.charAt(index) == ':') {
+					// parse bounds
+					index++; // consume ':'
+					if (classBound && signature.charAt(index) == ':') {
+						// No class bound, only interface bounds, so '::'
+						classBound = false;
+						continue;
+					}
+					classBound = false;
+					Map.Entry<Integer, TypeName> bound = parseParameterizedType(signature, index);
+					index = bound.getKey();
+					bounds.add(bound.getValue());
+				}
+
+				generics.add(TypeVariableName.get(genericName, bounds.toArray(new TypeName[0])));
+			}
+
+			index++; // consume '>'
+		}
+
+		if (signature.charAt(index) != '(') {
+			throw errorAt(signature, index);
+		}
+		index++; // consume '('
+
+		LinkedList<TypeName> params = new LinkedList<>();
+		while (signature.charAt(index) != ')') {
+			Map.Entry<Integer, TypeName> param = parseParameterizedType(signature, index);
+			index = param.getKey();
+			params.add(param.getValue());
+		}
+
+		index++; // consume ')'
+
+		TypeName returnType;
+		if (signature.charAt(index) == 'V') {
+			returnType = TypeName.VOID;
+			index++;
+		} else {
+			Map.Entry<Integer, TypeName> parsedReturnType = parseParameterizedType(signature, index);
+			index = parsedReturnType.getKey();
+			returnType = parsedReturnType.getValue();
+		}
+
+		LinkedList<TypeName> thrown = new LinkedList<>();
+		while (index < signature.length() && signature.charAt(index) == '^') {
+			index++; // consume '^'
+			Map.Entry<Integer, TypeName> parsedThrown = parseParameterizedType(signature, index);
+			index = parsedThrown.getKey();
+			thrown.addLast(parsedThrown.getValue());
+		}
+
+		return new MethodSignature(generics, params, returnType, thrown);
+	}
+
+	public static final class MethodSignature {
+		// Nullable
+		public final List<TypeVariableName> generics;
+		public final List<TypeName> parameters;
+		public final TypeName result;
+		public final List<TypeName> thrown;
+
+		MethodSignature(List<TypeVariableName> generics, List<TypeName> parameters, TypeName result, List<TypeName> thrown) {
+			this.generics = generics;
+			this.parameters = parameters;
+			this.result = result;
+			this.thrown = thrown;
+		}
+	}
+
+	public static TypeName parseFieldSignature(String signature) {
+		return parseParameterizedType(signature, 0).getValue();
+	}
+
 	public static Map.Entry<Integer, TypeName> parseParameterizedType(final String signature, final int startOffset) {
 		GenericStack stack = new GenericStack();
 
@@ -225,11 +389,12 @@ public final class Signatures {
 		static Frame<ParameterizedTypeName> ofGenericInnerClass(ParameterizedTypeName outerClass, String innerName) {
 			return parameters -> outerClass.nestedClass(innerName, parameters);
 		}
-		
+
 		static Frame<TypeName> collecting() {
 			return parameters -> {
-				if (parameters.size() != 1)
+				if (parameters.size() != 1) {
 					throw new IllegalStateException();
+				}
 				return parameters.get(0);
 			};
 		}
@@ -274,7 +439,7 @@ public final class Signatures {
 			LinkedList<TypeName> typeNames = deque.getLast().typeNames;
 			typeNames.addLast(modifier.apply(typeNames.removeLast()));
 		}
-		
+
 		public TypeName collectFrame() {
 			return deque.removeLast().pop();
 		}
