@@ -148,6 +148,7 @@ public class MethodBuilder {
 
 	static String reserveValidName(String suggestedName, Set<String> usedNames) {
 		if (!usedNames.contains(suggestedName)) {
+			usedNames.add(suggestedName);
 			return suggestedName;
 		}
 		int t = 2;
