@@ -34,3 +34,5 @@ dependencies {
 test {
     useJUnitPlatform()
 }
+
+tasks.assemble.dependsOn shadowJar

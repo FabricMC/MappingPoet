@@ -10,7 +10,7 @@ import com.squareup.javapoet.TypeName;
 import net.fabricmc.mappings.EntryTriple;
 
 import com.squareup.javapoet.TypeSpec;
-import jdk.internal.org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 
