@@ -5,6 +5,7 @@ import java.util.Map;
 
 import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.TypeName;
 import net.fabricmc.mappings.EntryTriple;
@@ -39,30 +40,45 @@ public class FieldBuilder {
 		return ret;
 	}
 
-	private String makeInitializer(String desc) {
+	private CodeBlock makeInitializer(String desc) {
 		// fake initializers exclude fields from constant values
 		switch (desc.charAt(0)) {
 		case 'B':
 		case 'C':
 		case 'D':
-		case 'F':
 		case 'I':
 		case 'J':
 		case 'S':
 			if (fieldNode.value != null) {
-				return String.valueOf(fieldNode.value);
+				return CodeBlock.builder().add(String.valueOf(fieldNode.value)).build();
 			}
-			return "java.lang.Byte.parseByte(\"dummy\")";
+			return CodeBlock.builder().add("java.lang.Byte.parseByte(\"dummy\")").build();
+		case 'F':
+			if (fieldNode.value != null) {
+				return CodeBlock.builder().add(fieldNode.value + "f").build();
+			}
+			return CodeBlock.builder().add("java.lang.Float.parseFloat(\"dummy\")").build();
 		case 'Z':
 			if (fieldNode.value instanceof Number) {
-				return Boolean.toString(((Number) fieldNode.value).intValue() != 0);
+				return CodeBlock.builder().add(Boolean.toString(((Number) fieldNode.value).intValue() != 0)).build();
 			}
-			return "java.lang.Boolean.parseBoolean(\"dummy\")";
+			return CodeBlock.builder().add("java.lang.Boolean.parseBoolean(\"dummy\")").build();
 		}
 		if (fieldNode.value != null) {
-			return String.valueOf(fieldNode.value);
+			return CodeBlock.builder().add("\"$L\"", escapeJava(String.valueOf(fieldNode.value))).build();
 		}
-		return desc.equals("Ljava/lang/String;") ? "java.lang.String.valueOf(\"dummy\")" : "null";
+		return CodeBlock.builder().add(desc.equals("Ljava/lang/String;") ? "java.lang.String.valueOf(\"dummy\")" : "null").build();
+	}
+
+	private static String escapeJava(String source) {
+		return source
+				.replaceAll("\\\\", "\\\\")
+				.replaceAll("\t", "\\t")
+				.replaceAll("\b", "\\b")
+				.replaceAll("\n", "\\n")
+				.replaceAll("\r", "\\r")
+				.replaceAll("\f", "\\f")
+				.replaceAll("\"", "\\\"");
 	}
 
 	static void addFieldJavaDoc(TypeSpec.Builder enumBuilder, MappingsStore mappings, ClassNode classNode, FieldNode fieldNode) {
