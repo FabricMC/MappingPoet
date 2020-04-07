@@ -2,7 +2,6 @@ package net.fabricmc.mappingpoet;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import com.squareup.javapoet.ClassName;
@@ -40,13 +39,13 @@ public class ClassBuilder {
 		}
 		TypeSpec.Builder builder;
 		if (Modifier.isInterface(classNode.access)) {
-			builder = TypeSpec.interfaceBuilder(getClassName(classNode.name));
+			builder = TypeSpec.interfaceBuilder(parseInternalName(classNode.name));
 		} else if (classNode.superName.equals("java/lang/Enum")) {
 			enumClass = true;
-			builder = TypeSpec.enumBuilder(getClassName(classNode.name));
+			builder = TypeSpec.enumBuilder(parseInternalName(classNode.name));
 		} else {
-			builder = TypeSpec.classBuilder(getClassName(classNode.name))
-					.superclass(signature == null ? getClassName(classNode.superName) : signature.superclass);
+			builder = TypeSpec.classBuilder(parseInternalName(classNode.name))
+					.superclass(signature == null ? parseInternalName(classNode.superName) : signature.superclass);
 		}
 
 		if (signature != null && signature.generics != null) {
@@ -65,7 +64,7 @@ public class ClassBuilder {
 		if (classNode.interfaces == null) return;
 
 		for (String iFace : classNode.interfaces) {
-			builder.addSuperinterface(getClassName(iFace));
+			builder.addSuperinterface(parseInternalName(iFace));
 		}
 	}
 
@@ -130,9 +129,6 @@ public class ClassBuilder {
 			classBuilder.builder.addModifiers(javax.lang.model.element.Modifier.STATIC);
 		} else {
 			classBuilder.builder.addModifiers(new ModifierBuilder(innerClassNode.access).getModifiers(classBuilder.enumClass ? ModifierBuilder.Type.ENUM : ModifierBuilder.Type.CLASS));
-//			if ((classBuilder.classNode.access & Opcodes.ACC_INTERFACE) != 0) {
-//				classBuilder.builder.addModifiers(javax.lang.model.element.Modifier.PUBLIC); // todo javapoet bug? ifaces can be package
-//			}
 		}
 		innerClasses.add(classBuilder);
 	}
@@ -183,18 +179,5 @@ public class ClassBuilder {
 		}
 
 		return currentClassName;
-	}
-
-	@Deprecated // Use parseInternalName, less allocations
-	public static ClassName getClassName(String input) {
-		int lastDelim = input.lastIndexOf("/");
-		String packageName = input.substring(0, lastDelim).replaceAll("/", ".");
-		String className = input.substring(lastDelim + 1).replaceAll("/", ".");
-
-		List<String> classSplit = new ArrayList<>(Arrays.asList(className.split("\\$")));
-		String parentClass = classSplit.get(0);
-		classSplit.remove(0);
-
-		return ClassName.get(packageName, parentClass, classSplit.toArray(new String[] {}));
 	}
 }

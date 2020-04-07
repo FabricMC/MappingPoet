@@ -10,6 +10,7 @@ import com.squareup.javapoet.TypeName;
 import net.fabricmc.mappings.EntryTriple;
 
 import com.squareup.javapoet.TypeSpec;
+import jdk.internal.org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 
@@ -28,9 +29,30 @@ public class FieldBuilder {
 	}
 
 	private FieldSpec.Builder createBuilder() {
-		return FieldSpec.builder(calculateType(), fieldNode.name)
-				.addModifiers(new ModifierBuilder(fieldNode.access).getModifiers(ModifierBuilder.Type.FIELD))
-				.initializer("null");
+		FieldSpec.Builder ret = FieldSpec.builder(calculateType(), fieldNode.name)
+				.addModifiers(new ModifierBuilder(fieldNode.access).getModifiers(ModifierBuilder.Type.FIELD));
+
+		if ((fieldNode.access & Opcodes.ACC_STATIC) != 0) {
+			ret.initializer(makeInitializer(fieldNode.desc)); // so jd doesn't complain about type mismatch
+		}
+
+		return ret;
+	}
+
+	static String makeInitializer(String desc) {
+		switch (desc.charAt(0)) {
+		case 'B':
+		case 'C':
+		case 'D':
+		case 'F':
+		case 'I':
+		case 'J':
+		case 'S':
+			return "0";
+		case 'Z':
+			return "false";
+		}
+		return "null";
 	}
 
 	static void addFieldJavaDoc(TypeSpec.Builder enumBuilder, MappingsStore mappings, ClassNode classNode, FieldNode fieldNode) {
@@ -190,7 +212,7 @@ public class FieldBuilder {
 			return ArrayTypeName.of(getFieldType(desc.substring(1)));
 		}
 		if (desc.startsWith("L")) {
-			return ClassBuilder.getClassName(desc.substring(1).substring(0, desc.length() -2));
+			return ClassBuilder.parseInternalName(desc.substring(1).substring(0, desc.length() -2));
 		}
 		throw new UnsupportedOperationException("Unknown field type" + desc);
 	}

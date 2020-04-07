@@ -10,7 +10,6 @@ import java.util.Set;
 
 import javax.lang.model.element.Modifier;
 
-import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
@@ -237,35 +236,6 @@ public class MethodBuilder {
 		if (javaDoc != null) {
 			builder.addJavadoc(javaDoc);
 		}
-	}
-
-	@Deprecated // use FieldBuilder.parseType non recursive version
-	private TypeName getFieldType(String desc) {
-		switch (desc) {
-		case "B":
-			return TypeName.BYTE;
-		case "C":
-			return TypeName.CHAR;
-		case "S":
-			return TypeName.SHORT;
-		case "Z":
-			return TypeName.BOOLEAN;
-		case "I":
-			return TypeName.INT;
-		case "J":
-			return TypeName.LONG;
-		case "F":
-			return TypeName.FLOAT;
-		case "D":
-			return TypeName.DOUBLE;
-		}
-		if (desc.startsWith("[")) {
-			return ArrayTypeName.of(getFieldType(desc.substring(1)));
-		}
-		if (desc.startsWith("L")) {
-			return ClassBuilder.getClassName(desc.substring(1).substring(0, desc.length() - 2));
-		}
-		throw new UnsupportedOperationException("Unknown field type" + desc);
 	}
 
 	public MethodSpec build() {
