@@ -10,6 +10,7 @@ import com.squareup.javapoet.TypeSpec;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.InnerClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
 public class ClassBuilder {
@@ -114,8 +115,25 @@ public class ClassBuilder {
 	}
 
 	public void addInnerClass(ClassBuilder classBuilder) {
-		classBuilder.builder.addModifiers(javax.lang.model.element.Modifier.PUBLIC);
-		classBuilder.builder.addModifiers(javax.lang.model.element.Modifier.STATIC);
+		InnerClassNode innerClassNode = null;
+		if (classNode.innerClasses != null) {
+			for (InnerClassNode node : classNode.innerClasses) {
+				if (node.name.equals(classBuilder.classNode.name)) {
+					innerClassNode = node;
+					break;
+				}
+			}
+		}
+		if (innerClassNode == null) {
+			// fallback
+			classBuilder.builder.addModifiers(javax.lang.model.element.Modifier.PUBLIC);
+			classBuilder.builder.addModifiers(javax.lang.model.element.Modifier.STATIC);
+		} else {
+			classBuilder.builder.addModifiers(new ModifierBuilder(innerClassNode.access).getModifiers(classBuilder.enumClass ? ModifierBuilder.Type.ENUM : ModifierBuilder.Type.CLASS));
+//			if ((classBuilder.classNode.access & Opcodes.ACC_INTERFACE) != 0) {
+//				classBuilder.builder.addModifiers(javax.lang.model.element.Modifier.PUBLIC); // todo javapoet bug? ifaces can be package
+//			}
+		}
 		innerClasses.add(classBuilder);
 	}
 

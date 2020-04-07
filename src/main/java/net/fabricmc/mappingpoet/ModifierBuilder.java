@@ -32,9 +32,11 @@ public class ModifierBuilder {
 
 		if (java.lang.reflect.Modifier.isAbstract(access) && type != Type.ENUM) {
 			modifiers.add(Modifier.ABSTRACT);
-		} else if (java.lang.reflect.Modifier.isStatic(access) && type != Type.ENUM) {
+		} 
+		if (java.lang.reflect.Modifier.isStatic(access)) {
 			modifiers.add(Modifier.STATIC);
-		} else if (type == Type.METHOD) {
+		}
+		if (!java.lang.reflect.Modifier.isAbstract(access) && !java.lang.reflect.Modifier.isStatic(access) && type == Type.METHOD) {
 			modifiers.add(Modifier.DEFAULT);
 		}
 
