@@ -83,14 +83,17 @@ public class MethodBuilder {
 	}
 
 	private void addParameters() {
+		// todo fix enum ctors
 		List<ParamType> paramTypes = new ArrayList<>();
 		boolean instanceMethod = !builder.modifiers.contains(Modifier.STATIC);
+		Set<String> usedParamNames = new HashSet<>(RESERVED_KEYWORDS);
 		if (signature != null) {
-			getGenericParams(paramTypes, instanceMethod);
+			getGenericParams(paramTypes, instanceMethod, usedParamNames);
 		} else {
-			getDescParams(paramTypes, instanceMethod);
+			getDescParams(paramTypes, instanceMethod, usedParamNames);
 		}
 		for (ParamType paramType : paramTypes) {
+			paramType.fillName(usedParamNames);
 			ParameterSpec.Builder paramBuilder = ParameterSpec.builder(paramType.type, paramType.name, paramType.modifiers);
 			if (paramType.comment != null) {
 				paramBuilder.addJavadoc(paramType.comment);
@@ -99,11 +102,10 @@ public class MethodBuilder {
 		}
 	}
 
-	private void getGenericParams(List<ParamType> paramTypes, boolean instance) {
-		Set<String> usedParamNames = new HashSet<>(RESERVED_KEYWORDS);
+	private void getGenericParams(List<ParamType> paramTypes, boolean instance, Set<String> usedParamNames) {
 		int slot = instance ? 1 : 0;
 		for (TypeName each : signature.parameters) {
-			paramTypes.add(new ParamType(mappings.getParamNameAndDoc(new EntryTriple(classNode.name, methodNode.name, methodNode.desc), slot), each, usedParamNames));
+			paramTypes.add(new ParamType(mappings.getParamNameAndDoc(new EntryTriple(classNode.name, methodNode.name, methodNode.desc), slot), each, usedParamNames, slot));
 			slot++;
 			if (each.equals(TypeName.DOUBLE) || each.equals(TypeName.LONG)) {
 				slot++;
@@ -111,8 +113,7 @@ public class MethodBuilder {
 		}
 	}
 
-	private void getDescParams(List<ParamType> paramTypes, boolean instance) {
-		Set<String> usedParamNames = new HashSet<>(RESERVED_KEYWORDS);
+	private void getDescParams(List<ParamType> paramTypes, boolean instance, Set<String> usedParamNames) {
 		int slot = instance ? 1 : 0;
 		final String desc = methodNode.desc;
 		int index = 0;
@@ -127,7 +128,7 @@ public class MethodBuilder {
 			index = parsedParam.getKey();
 			TypeName paramType = parsedParam.getValue();
 
-			paramTypes.add(new ParamType(mappings.getParamNameAndDoc(new EntryTriple(classNode.name, methodNode.name, methodNode.desc), slot), paramType, usedParamNames));
+			paramTypes.add(new ParamType(mappings.getParamNameAndDoc(new EntryTriple(classNode.name, methodNode.name, methodNode.desc), slot), paramType, usedParamNames, slot));
 			slot++;
 			if (paramType.equals(TypeName.DOUBLE) || paramType.equals(TypeName.LONG)) {
 				slot++;
@@ -145,58 +146,73 @@ public class MethodBuilder {
 		return new IllegalArgumentException(String.format("Invalid method descriptor at %d: \"%s\"", index, desc));
 	}
 
-	private static class ParamType {
-		private final String name;
+	static String reserveValidName(String suggestedName, Set<String> usedNames) {
+		if (!usedNames.contains(suggestedName)) {
+			return suggestedName;
+		}
+		int t = 2;
+		String currentSuggestion = suggestedName + t;
+		while (usedNames.contains(currentSuggestion)) {
+			t++;
+			currentSuggestion = suggestedName + t;
+		}
+		
+		usedNames.add(currentSuggestion);
+
+		return currentSuggestion;
+	}
+
+	static String suggestName(TypeName type) {
+		String str = type.toString();
+		int newStart = 0;
+		int newEnd = str.length();
+		int ltStart;
+		ltStart = str.indexOf('<', newStart);
+		if (ltStart != -1 && ltStart < newEnd) {
+			newEnd = ltStart;
+		}
+		ltStart = str.indexOf('[', newStart);
+		if (ltStart != -1 && ltStart < newEnd) {
+			newEnd = ltStart;
+		}
+		int dotEnd;
+		if ((dotEnd = str.lastIndexOf(".", newEnd)) != -1) {
+			newStart = dotEnd + 1;
+		}
+		str = Character.toLowerCase(str.charAt(newStart)) + str.substring(newStart + 1, newEnd);
+
+		if (str.equals("boolean")) {
+			str = "bool";
+		}
+		return str;
+	}
+
+	private class ParamType {
+		private String name;
 		private final TypeName type;
 		private final Modifier[] modifiers;
 		final String comment;
 
-		public ParamType(Map.Entry<String, String> nameAndDoc, TypeName type, Set<String> usedNames) {
-			this.name = nameAndDoc != null ? nameAndDoc.getKey() : generateValidName(suggestName(type), usedNames);
-			usedNames.add(this.name);
+		public ParamType(Map.Entry<String, String> nameAndDoc, TypeName type, Set<String> usedNames, int slot) {
+			this.name = nameAndDoc != null ? nameAndDoc.getKey() : null;
+			if (this.name != null) {
+				if (usedNames.contains(this.name)) {
+					System.err.println(String.format("Overridden parameter name detected in %s %s %s slot %d, resetting", classNode.name, methodNode.name, methodNode.desc, slot));
+					this.name = null;
+				} else {
+					usedNames.add(this.name);
+				}
+			}
 			this.comment = nameAndDoc == null ? null : nameAndDoc.getValue();
 			this.type = type;
 			this.modifiers = new ModifierBuilder(0)
 					.getModifiers(ModifierBuilder.Type.PARAM);
 		}
 		
-		private static String generateValidName(String suggestedName, Set<String> usedNames) {
-			if (!usedNames.contains(suggestedName)) {
-				return suggestedName;
-			}
-			int t = 2;
-			String currentSuggestion = suggestedName + t;
-			while (usedNames.contains(currentSuggestion)) {
-				t++;
-				currentSuggestion = suggestedName + t;
-			}
-			
-			return currentSuggestion;
-		}
-
-		private static String suggestName(TypeName type) {
-			String str = type.toString();
-			int newStart = 0;
-			int newEnd = str.length();
-			int ltStart;
-			ltStart = str.indexOf('<', newStart);
-			if (ltStart != -1 && ltStart < newEnd) {
-				newEnd = ltStart;
-			}
-			ltStart = str.indexOf('[', newStart);
-			if (ltStart != -1 && ltStart < newEnd) {
-				newEnd = ltStart;
-			}
-			int dotEnd;
-			if ((dotEnd = str.lastIndexOf(".", newEnd)) != -1) {
-				newStart = dotEnd + 1;
-			}
-			str = Character.toLowerCase(str.charAt(newStart)) + str.substring(newStart + 1, newEnd);
-
-			if (str.equals("boolean")) {
-				str = "bool";
-			}
-			return str;
+		private void fillName(Set<String> usedNames) {
+			if (name != null)
+				return;
+			name = reserveValidName(suggestName(type), usedNames);
 		}
 	}
 
