@@ -15,6 +15,7 @@ import javax.lang.model.element.Modifier;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterSpec;
 import com.squareup.javapoet.TypeName;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -43,9 +44,72 @@ public class MethodBuilder {
 		this.superGetter = superGetter;
 		this.builder = createBuilder();
 		addJavaDoc();
+		addDirectAnnotations();
 		setReturnType();
 		addParameters();
 		addExceptions();
+	}
+
+	private static void addDirectAnnotations(ParameterSpec.Builder builder, List<AnnotationNode>[] regularAnnotations, int index) {
+		if (regularAnnotations == null || regularAnnotations.length <= index) {
+			return;
+		}
+		addDirectAnnotations(builder, regularAnnotations[index]);
+	}
+
+	private static void addDirectAnnotations(ParameterSpec.Builder builder, List<AnnotationNode> regularAnnotations) {
+		if (regularAnnotations == null) {
+			return;
+		}
+		for (AnnotationNode annotation : regularAnnotations) {
+			builder.addAnnotation(FieldBuilder.parseAnnotation(annotation));
+		}
+	}
+
+	private static IllegalArgumentException invalidMethodDesc(String desc, int index) {
+		return new IllegalArgumentException(String.format("Invalid method descriptor at %d: \"%s\"", index, desc));
+	}
+
+	static String reserveValidName(String suggestedName, Set<String> usedNames) {
+		if (!usedNames.contains(suggestedName)) {
+			usedNames.add(suggestedName);
+			return suggestedName;
+		}
+		int t = 2;
+		String currentSuggestion = suggestedName + t;
+		while (usedNames.contains(currentSuggestion)) {
+			t++;
+			currentSuggestion = suggestedName + t;
+		}
+
+		usedNames.add(currentSuggestion);
+
+		return currentSuggestion;
+	}
+
+	static String suggestName(TypeName type) {
+		String str = type.toString();
+		int newStart = 0;
+		int newEnd = str.length();
+		int ltStart;
+		ltStart = str.indexOf('<', newStart);
+		if (ltStart != -1 && ltStart < newEnd) {
+			newEnd = ltStart;
+		}
+		ltStart = str.indexOf('[', newStart);
+		if (ltStart != -1 && ltStart < newEnd) {
+			newEnd = ltStart;
+		}
+		int dotEnd;
+		if ((dotEnd = str.lastIndexOf(".", newEnd)) != -1) {
+			newStart = dotEnd + 1;
+		}
+		str = Character.toLowerCase(str.charAt(newStart)) + str.substring(newStart + 1, newEnd);
+
+		if (str.equals("boolean")) {
+			str = "bool";
+		}
+		return str;
 	}
 
 	private MethodSpec.Builder createBuilder() {
@@ -63,6 +127,20 @@ public class MethodBuilder {
 		}
 
 		return builder;
+	}
+
+	private void addDirectAnnotations() {
+		addDirectAnnotations(methodNode.invisibleAnnotations);
+		addDirectAnnotations(methodNode.visibleAnnotations);
+	}
+
+	private void addDirectAnnotations(List<AnnotationNode> regularAnnotations) {
+		if (regularAnnotations == null) {
+			return;
+		}
+		for (AnnotationNode annotation : regularAnnotations) {
+			builder.addAnnotation(FieldBuilder.parseAnnotation(annotation));
+		}
 	}
 
 	private void setReturnType() {
@@ -95,13 +173,20 @@ public class MethodBuilder {
 		} else {
 			getDescParams(paramTypes, instanceMethod, usedParamNames);
 		}
+
+		List<AnnotationNode>[] visibleParameterAnnotations = methodNode.visibleParameterAnnotations;
+		List<AnnotationNode>[] invisibleParameterAnnotations = methodNode.invisibleParameterAnnotations;
+		int index = 0;
 		for (ParamType paramType : paramTypes) {
 			paramType.fillName(usedParamNames);
 			ParameterSpec.Builder paramBuilder = ParameterSpec.builder(paramType.type, paramType.name, paramType.modifiers);
 			if (paramType.comment != null) {
 				paramBuilder.addJavadoc(paramType.comment + "\n");
 			}
+			addDirectAnnotations(paramBuilder, visibleParameterAnnotations, index);
+			addDirectAnnotations(paramBuilder, invisibleParameterAnnotations, index);
 			builder.addParameter(paramBuilder.build());
+			index++;
 		}
 	}
 
@@ -145,81 +230,6 @@ public class MethodBuilder {
 		 */
 	}
 
-	private static IllegalArgumentException invalidMethodDesc(String desc, int index) {
-		return new IllegalArgumentException(String.format("Invalid method descriptor at %d: \"%s\"", index, desc));
-	}
-
-	static String reserveValidName(String suggestedName, Set<String> usedNames) {
-		if (!usedNames.contains(suggestedName)) {
-			usedNames.add(suggestedName);
-			return suggestedName;
-		}
-		int t = 2;
-		String currentSuggestion = suggestedName + t;
-		while (usedNames.contains(currentSuggestion)) {
-			t++;
-			currentSuggestion = suggestedName + t;
-		}
-		
-		usedNames.add(currentSuggestion);
-
-		return currentSuggestion;
-	}
-
-	static String suggestName(TypeName type) {
-		String str = type.toString();
-		int newStart = 0;
-		int newEnd = str.length();
-		int ltStart;
-		ltStart = str.indexOf('<', newStart);
-		if (ltStart != -1 && ltStart < newEnd) {
-			newEnd = ltStart;
-		}
-		ltStart = str.indexOf('[', newStart);
-		if (ltStart != -1 && ltStart < newEnd) {
-			newEnd = ltStart;
-		}
-		int dotEnd;
-		if ((dotEnd = str.lastIndexOf(".", newEnd)) != -1) {
-			newStart = dotEnd + 1;
-		}
-		str = Character.toLowerCase(str.charAt(newStart)) + str.substring(newStart + 1, newEnd);
-
-		if (str.equals("boolean")) {
-			str = "bool";
-		}
-		return str;
-	}
-
-	private class ParamType {
-		private String name;
-		private final TypeName type;
-		private final Modifier[] modifiers;
-		final String comment;
-
-		public ParamType(Map.Entry<String, String> nameAndDoc, TypeName type, Set<String> usedNames, int slot) {
-			this.name = nameAndDoc != null ? nameAndDoc.getKey() : null;
-			if (this.name != null) {
-				if (usedNames.contains(this.name)) {
-					System.err.println(String.format("Overridden parameter name detected in %s %s %s slot %d, resetting", classNode.name, methodNode.name, methodNode.desc, slot));
-					this.name = null;
-				} else {
-					usedNames.add(this.name);
-				}
-			}
-			this.comment = nameAndDoc == null ? null : nameAndDoc.getValue();
-			this.type = type;
-			this.modifiers = new ModifierBuilder(0)
-					.getModifiers(ModifierBuilder.Type.PARAM);
-		}
-		
-		private void fillName(Set<String> usedNames) {
-			if (name != null)
-				return;
-			name = reserveValidName(suggestName(type), usedNames);
-		}
-	}
-
 	private void addExceptions() {
 		if (signature != null) {
 			for (TypeName each : signature.thrown) {
@@ -244,5 +254,35 @@ public class MethodBuilder {
 
 	public MethodSpec build() {
 		return builder.build();
+	}
+
+	private class ParamType {
+		final String comment;
+		private final TypeName type;
+		private final Modifier[] modifiers;
+		private String name;
+
+		public ParamType(Map.Entry<String, String> nameAndDoc, TypeName type, Set<String> usedNames, int slot) {
+			this.name = nameAndDoc != null ? nameAndDoc.getKey() : null;
+			if (this.name != null) {
+				if (usedNames.contains(this.name)) {
+					System.err.println(String.format("Overridden parameter name detected in %s %s %s slot %d, resetting", classNode.name, methodNode.name, methodNode.desc, slot));
+					this.name = null;
+				} else {
+					usedNames.add(this.name);
+				}
+			}
+			this.comment = nameAndDoc == null ? null : nameAndDoc.getValue();
+			this.type = type;
+			this.modifiers = new ModifierBuilder(0)
+					.getModifiers(ModifierBuilder.Type.PARAM);
+		}
+
+		private void fillName(Set<String> usedNames) {
+			if (name != null) {
+				return;
+			}
+			name = reserveValidName(suggestName(type), usedNames);
+		}
 	}
 }

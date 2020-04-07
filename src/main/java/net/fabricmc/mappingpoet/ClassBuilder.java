@@ -9,6 +9,7 @@ import java.util.function.Function;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeSpec;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.InnerClassNode;
@@ -32,9 +33,47 @@ public class ClassBuilder {
 		this.superGetter = superGetter;
 		this.builder = setupBuilder();
 		addInterfaces();
+		addDirectAnnotations();
 		addMethods();
 		addFields();
 		addJavaDoc();
+	}
+
+	public static ClassName parseInternalName(String internalName) {
+		int classNameSeparator = -1;
+		int index = 0;
+		int nameStart = index;
+		ClassName currentClassName = null;
+
+		char ch;
+		do {
+			ch = index == internalName.length() ? ';' : internalName.charAt(index);
+
+			if (ch == '$' || ch == ';') {
+				// collect class name
+				if (currentClassName == null) {
+					String packageName = nameStart < classNameSeparator ? internalName.substring(nameStart, classNameSeparator).replace('/', '.') : "";
+					String simpleName = internalName.substring(classNameSeparator + 1, index);
+					currentClassName = ClassName.get(packageName, simpleName);
+				} else {
+					String simpleName = internalName.substring(classNameSeparator + 1, index);
+					currentClassName = currentClassName.nestedClass(simpleName);
+				}
+			}
+
+			if (ch == '/' || ch == '$') {
+				// Start of simple name
+				classNameSeparator = index;
+			}
+
+			index++;
+		} while (ch != ';');
+
+		if (currentClassName == null) {
+			throw new IllegalArgumentException(String.format("Invalid internal name \"%s\"", internalName));
+		}
+
+		return currentClassName;
 	}
 
 	private TypeSpec.Builder setupBuilder() {
@@ -69,6 +108,20 @@ public class ClassBuilder {
 
 		for (String iFace : classNode.interfaces) {
 			builder.addSuperinterface(parseInternalName(iFace));
+		}
+	}
+
+	private void addDirectAnnotations() {
+		addDirectAnnotations(classNode.invisibleAnnotations);
+		addDirectAnnotations(classNode.visibleAnnotations);
+	}
+
+	private void addDirectAnnotations(List<AnnotationNode> regularAnnotations) {
+		if (regularAnnotations == null) {
+			return;
+		}
+		for (AnnotationNode annotation : regularAnnotations) {
+			builder.addAnnotation(FieldBuilder.parseAnnotation(annotation));
 		}
 	}
 
@@ -146,42 +199,5 @@ public class ClassBuilder {
 				.map(ClassBuilder::build)
 				.forEach(builder::addType);
 		return builder.build();
-	}
-
-	public static ClassName parseInternalName(String internalName) {
-		int classNameSeparator = -1;
-		int index = 0;
-		int nameStart = index;
-		ClassName currentClassName = null;
-
-		char ch;
-		do {
-			ch = index == internalName.length() ? ';' : internalName.charAt(index);
-
-			if (ch == '$' || ch == ';') {
-				// collect class name
-				if (currentClassName == null) {
-					String packageName = nameStart < classNameSeparator ? internalName.substring(nameStart, classNameSeparator).replace('/', '.') : "";
-					String simpleName = internalName.substring(classNameSeparator + 1, index);
-					currentClassName = ClassName.get(packageName, simpleName);
-				} else {
-					String simpleName = internalName.substring(classNameSeparator + 1, index);
-					currentClassName = currentClassName.nestedClass(simpleName);
-				}
-			}
-
-			if (ch == '/' || ch == '$') {
-				// Start of simple name
-				classNameSeparator = index;
-			}
-
-			index++;
-		} while (ch != ';');
-
-		if (currentClassName == null) {
-			throw new IllegalArgumentException(String.format("Invalid internal name \"%s\"", internalName));
-		}
-
-		return currentClassName;
 	}
 }
