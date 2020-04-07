@@ -29,7 +29,8 @@ public class FieldBuilder {
 
 	private FieldSpec.Builder createBuilder() {
 		return FieldSpec.builder(calculateType(), fieldNode.name)
-				.addModifiers(new ModifierBuilder(fieldNode.access).getModifiers(ModifierBuilder.Type.FIELD));
+				.addModifiers(new ModifierBuilder(fieldNode.access).getModifiers(ModifierBuilder.Type.FIELD))
+				.initializer("null");
 	}
 
 	static void addFieldJavaDoc(TypeSpec.Builder enumBuilder, MappingsStore mappings, ClassNode classNode, FieldNode fieldNode) {

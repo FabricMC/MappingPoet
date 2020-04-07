@@ -1,16 +1,16 @@
 package net.fabricmc.mappingpoet;
 
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeSpec;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
-
-import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 public class ClassBuilder {
 
@@ -19,8 +19,9 @@ public class ClassBuilder {
 
 	private final TypeSpec.Builder builder;
 	private final List<ClassBuilder> innerClasses = new ArrayList<>();
-	
+
 	private Signatures.ClassSignature signature;
+	private boolean enumClass;
 
 	public ClassBuilder(MappingsStore mappings, ClassNode classNode) {
 		this.mappings = mappings;
@@ -40,18 +41,19 @@ public class ClassBuilder {
 		if (Modifier.isInterface(classNode.access)) {
 			builder = TypeSpec.interfaceBuilder(getClassName(classNode.name));
 		} else if (classNode.superName.equals("java/lang/Enum")) {
+			enumClass = true;
 			builder = TypeSpec.enumBuilder(getClassName(classNode.name));
 		} else {
 			builder = TypeSpec.classBuilder(getClassName(classNode.name))
 					.superclass(signature == null ? getClassName(classNode.superName) : signature.superclass);
 		}
-		
+
 		if (signature != null && signature.generics != null) {
 			builder.addTypeVariables(signature.generics);
 		}
 
 		return builder
-				.addModifiers(new ModifierBuilder(classNode.access).getModifiers(ModifierBuilder.Type.CLASS));
+				.addModifiers(new ModifierBuilder(classNode.access).getModifiers(enumClass ? ModifierBuilder.Type.ENUM : ModifierBuilder.Type.CLASS));
 	}
 
 	private void addInterfaces() {
@@ -61,11 +63,11 @@ public class ClassBuilder {
 		}
 		if (classNode.interfaces == null) return;
 
-		for (String iFace :classNode.interfaces){
+		for (String iFace : classNode.interfaces) {
 			builder.addSuperinterface(getClassName(iFace));
 		}
 	}
-	
+
 	private void addMethods() {
 		if (classNode.methods == null) return;
 		for (MethodNode method : classNode.methods) {
@@ -75,6 +77,15 @@ public class ClassBuilder {
 			if (method.name.equals("<clinit>")) {
 				continue;
 			}
+			if (enumClass) {
+				// Skip enum sugar methods
+				if (method.name.equals("values") && method.desc.equals("()[L" + classNode.name + ";")) {
+					continue;
+				}
+				if (method.name.equals("valueOf") && method.desc.equals("(Ljava/lang/String;)L" + classNode.name + ";")) {
+					continue;
+				}
+			}
 			builder.addMethod(new MethodBuilder(mappings, classNode, method).build());
 		}
 	}
@@ -82,9 +93,10 @@ public class ClassBuilder {
 	private void addFields() {
 		if (classNode.fields == null) return;
 		for (FieldNode field : classNode.fields) {
-			if ((field.access & Opcodes.ACC_SYNTHETIC) != 0)
+			if ((field.access & Opcodes.ACC_SYNTHETIC) != 0) {
 				continue; // hide synthetic stuff
-			if ((field.access & Opcodes.ACC_ENUM)  == 0) {
+			}
+			if ((field.access & Opcodes.ACC_ENUM) == 0) {
 				builder.addField(new FieldBuilder(mappings, classNode, field).build());
 			} else {
 				TypeSpec.Builder enumBuilder = TypeSpec.anonymousClassBuilder("");
@@ -93,7 +105,7 @@ public class ClassBuilder {
 			}
 		}
 	}
-	
+
 	private void addJavaDoc() {
 		String javadoc = mappings.getClassDoc(classNode.name);
 		if (javadoc != null) {
@@ -117,7 +129,7 @@ public class ClassBuilder {
 				.forEach(builder::addType);
 		return builder.build();
 	}
-	
+
 	public static ClassName parseInternalName(String internalName) {
 		int classNameSeparator = -1;
 		int index = 0;
@@ -148,9 +160,10 @@ public class ClassBuilder {
 			index++;
 		} while (ch != ';');
 
-		if (currentClassName == null)
+		if (currentClassName == null) {
 			throw new IllegalArgumentException(String.format("Invalid internal name \"%s\"", internalName));
-		
+		}
+
 		return currentClassName;
 	}
 
@@ -164,6 +177,6 @@ public class ClassBuilder {
 		String parentClass = classSplit.get(0);
 		classSplit.remove(0);
 
-		return ClassName.get(packageName, parentClass, classSplit.toArray(new String[]{}));
+		return ClassName.get(packageName, parentClass, classSplit.toArray(new String[] {}));
 	}
 }
