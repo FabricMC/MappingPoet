@@ -12,8 +12,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.AbstractMap;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 //Taken from loom
 public class MappingsStore {
@@ -50,8 +52,8 @@ public class MappingsStore {
 		return fieldDef != null ? fieldDef.getComment() : null;
 	}
 
-	public Map.Entry<String, String> getParamNameAndDoc(EntryTriple methodEntry, int index) {
-		MethodDef methodDef = methods.get(methodEntry);
+	public Map.Entry<String, String> getParamNameAndDoc(Function<String, Collection<String>> superGetters, EntryTriple methodEntry, int index) {
+		MethodDef methodDef = searchMethod(superGetters, methodEntry);
 		if (methodDef != null) {
 			if (methodDef.getParameters().isEmpty()) {
 				return null;
@@ -65,13 +67,36 @@ public class MappingsStore {
 		return null;
 	}
 
-	public String getMethodDoc(EntryTriple methodEntry) {
-		MethodDef methodDef = methods.get(methodEntry);
+	public String getMethodDoc(Function<String, Collection<String>> superGetters, EntryTriple methodEntry) {
+		MethodDef methodDef = searchMethod(superGetters, methodEntry);
 
 		if (methodDef != null) {
 			return methodDef.getComment(); // comment doc handled separately by javapoet
 		}
 
+		return null;
+	}
+	
+	private MethodDef searchMethod(Function<String, Collection<String>> superGetters, EntryTriple methodEntry) {
+		String className = methodEntry.getOwner();
+		if (!classes.containsKey(className)) {
+			return null;
+		}
+
+		if (methods.containsKey(methodEntry)) {
+			return methods.get(methodEntry); // Nullable!
+		}
+		
+		for (String superName : superGetters.apply(className)) {
+			EntryTriple triple = new EntryTriple(superName, methodEntry.getName(), methodEntry.getDesc());
+			MethodDef ret = searchMethod(superGetters, triple);
+			if (ret != null) {
+				methods.put(triple, ret);
+				return ret;
+			}
+		}
+		
+		methods.put(methodEntry, null);
 		return null;
 	}
 

@@ -2,7 +2,9 @@ package net.fabricmc.mappingpoet;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.function.Function;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.TypeSpec;
@@ -19,13 +21,15 @@ public class ClassBuilder {
 
 	private final TypeSpec.Builder builder;
 	private final List<ClassBuilder> innerClasses = new ArrayList<>();
+	private final Function<String, Collection<String>> superGetter;
 
 	private Signatures.ClassSignature signature;
 	private boolean enumClass;
 
-	public ClassBuilder(MappingsStore mappings, ClassNode classNode) {
+	public ClassBuilder(MappingsStore mappings, ClassNode classNode, Function<String, Collection<String>> superGetter) {
 		this.mappings = mappings;
 		this.classNode = classNode;
+		this.superGetter = superGetter;
 		this.builder = setupBuilder();
 		addInterfaces();
 		addMethods();
@@ -86,7 +90,7 @@ public class ClassBuilder {
 					continue;
 				}
 			}
-			builder.addMethod(new MethodBuilder(mappings, classNode, method).build());
+			builder.addMethod(new MethodBuilder(mappings, classNode, method, superGetter).build());
 		}
 	}
 

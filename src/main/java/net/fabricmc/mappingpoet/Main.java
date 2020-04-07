@@ -12,12 +12,16 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
@@ -61,7 +65,7 @@ public class Main {
 	public static void generate(Path mappings, Path inputJar, Path outputDirectory) {
 		final MappingsStore mapping = new MappingsStore(mappings);
 		Map<String, ClassBuilder> classes = new HashMap<>();
-		forEachClass(inputJar, classNode -> writeClass(mapping, classNode, classes));
+		forEachClass(inputJar, (superGetter, classNode) -> writeClass(mapping, classNode, classes, superGetter));
 
 		classes.values().stream()
 				.filter(classBuilder -> !classBuilder.getClassName().contains("$"))
@@ -78,8 +82,9 @@ public class Main {
 
 	}
 
-	private static void forEachClass(Path jar, Consumer<ClassNode> classNodeConsumer) {
+	private static void forEachClass(Path jar, BiConsumer<Function<String, Collection<String>>, ClassNode> classNodeConsumer) {
 		List<ClassNode> classes = new ArrayList<>();
+		Map<String, Collection<String>> supers = new HashMap<>();
 		try (final JarFile jarFile = new JarFile(jar.toFile())) {
 			Enumeration<JarEntry> entryEnumerator = jarFile.entries();
 
@@ -94,6 +99,16 @@ public class Main {
 					ClassReader reader = new ClassReader(is);
 					ClassNode classNode = new ClassNode();
 					reader.accept(classNode, 0);
+					List<String> superNames = new ArrayList<>();
+					if (classNode.superName != null && !classNode.superName.equals("java/lang/Object")) {
+						superNames.add(classNode.superName);
+					}
+					if (classNode.interfaces != null) {
+						superNames.addAll(classNode.interfaces);
+					}
+					if (!superNames.isEmpty()) {
+						supers.put(classNode.name, superNames);
+					}
 
 					classes.add(classNode);
 				}
@@ -105,14 +120,15 @@ public class Main {
 		//Sort all the classes making sure that inner classes come after the parent classes
 		classes.sort(Comparator.comparing(o -> o.name));
 
-		classes.forEach(classNodeConsumer);
+		Function<String, Collection<String>> superGetter = k -> supers.getOrDefault(k, Collections.emptyList());
+		classes.forEach(node -> classNodeConsumer.accept(superGetter, node));
 	}
 	
 	private static boolean isDigit(char ch) {
 		return ch >= '0' && ch <= '9';
 	}
 
-	private static void writeClass(MappingsStore mappings, ClassNode classNode, Map<String, ClassBuilder> existingClasses) {
+	private static void writeClass(MappingsStore mappings, ClassNode classNode, Map<String, ClassBuilder> existingClasses, Function<String, Collection<String>> superGetter) {
 		String name = classNode.name;
 		{
 			//Block anonymous class and their nested classes
@@ -124,7 +140,7 @@ public class Main {
 			}
 		}
 
-		ClassBuilder classBuilder = new ClassBuilder(mappings, classNode);
+		ClassBuilder classBuilder = new ClassBuilder(mappings, classNode, superGetter);
 
 		if (name.contains("$")) {
 			String parentClass = name.substring(0, name.lastIndexOf("$"));

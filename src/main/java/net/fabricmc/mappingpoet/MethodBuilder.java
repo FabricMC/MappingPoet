@@ -2,11 +2,13 @@ package net.fabricmc.mappingpoet;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 
 import javax.lang.model.element.Modifier;
 
@@ -30,13 +32,15 @@ public class MethodBuilder {
 	private final ClassNode classNode;
 	private final MethodNode methodNode;
 	private final MethodSpec.Builder builder;
+	private final Function<String, Collection<String>> superGetter;
 
 	private Signatures.MethodSignature signature;
 
-	public MethodBuilder(MappingsStore mappings, ClassNode classNode, MethodNode methodNode) {
+	public MethodBuilder(MappingsStore mappings, ClassNode classNode, MethodNode methodNode, Function<String, Collection<String>> superGetter) {
 		this.mappings = mappings;
 		this.classNode = classNode;
 		this.methodNode = methodNode;
+		this.superGetter = superGetter;
 		this.builder = createBuilder();
 		addJavaDoc();
 		setReturnType();
@@ -104,7 +108,7 @@ public class MethodBuilder {
 	private void getGenericParams(List<ParamType> paramTypes, boolean instance, Set<String> usedParamNames) {
 		int slot = instance ? 1 : 0;
 		for (TypeName each : signature.parameters) {
-			paramTypes.add(new ParamType(mappings.getParamNameAndDoc(new EntryTriple(classNode.name, methodNode.name, methodNode.desc), slot), each, usedParamNames, slot));
+			paramTypes.add(new ParamType(mappings.getParamNameAndDoc(superGetter, new EntryTriple(classNode.name, methodNode.name, methodNode.desc), slot), each, usedParamNames, slot));
 			slot++;
 			if (each.equals(TypeName.DOUBLE) || each.equals(TypeName.LONG)) {
 				slot++;
@@ -127,7 +131,7 @@ public class MethodBuilder {
 			index = parsedParam.getKey();
 			TypeName paramType = parsedParam.getValue();
 
-			paramTypes.add(new ParamType(mappings.getParamNameAndDoc(new EntryTriple(classNode.name, methodNode.name, methodNode.desc), slot), paramType, usedParamNames, slot));
+			paramTypes.add(new ParamType(mappings.getParamNameAndDoc(superGetter, new EntryTriple(classNode.name, methodNode.name, methodNode.desc), slot), paramType, usedParamNames, slot));
 			slot++;
 			if (paramType.equals(TypeName.DOUBLE) || paramType.equals(TypeName.LONG)) {
 				slot++;
@@ -232,7 +236,7 @@ public class MethodBuilder {
 	}
 
 	private void addJavaDoc() {
-		String javaDoc = mappings.getMethodDoc(new EntryTriple(classNode.name, methodNode.name, methodNode.desc));
+		String javaDoc = mappings.getMethodDoc(superGetter, new EntryTriple(classNode.name, methodNode.name, methodNode.desc));
 		if (javaDoc != null) {
 			builder.addJavadoc(javaDoc);
 		}
