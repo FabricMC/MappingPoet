@@ -150,8 +150,8 @@ public class Main {
 			int lastSearch = name.length();
 			while (lastSearch != -1) {
 				lastSearch = name.lastIndexOf('$', lastSearch - 1);
-				if (isDigit(name.charAt(lastSearch + 1))) // names starting with digit is illegal java
-				{
+				// names starting with digit is illegal java
+				if (isDigit(name.charAt(lastSearch + 1))) {
 					return;
 				}
 			}
