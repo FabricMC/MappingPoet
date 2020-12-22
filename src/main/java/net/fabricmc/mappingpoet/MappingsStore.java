@@ -16,13 +16,6 @@
 
 package net.fabricmc.mappingpoet;
 
-import net.fabricmc.mapping.tree.ClassDef;
-import net.fabricmc.mapping.tree.FieldDef;
-import net.fabricmc.mapping.tree.MethodDef;
-import net.fabricmc.mapping.tree.TinyMappingFactory;
-import net.fabricmc.mapping.tree.TinyTree;
-import net.fabricmc.mappings.EntryTriple;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -32,6 +25,13 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+
+import net.fabricmc.mapping.tree.ClassDef;
+import net.fabricmc.mapping.tree.FieldDef;
+import net.fabricmc.mapping.tree.MethodDef;
+import net.fabricmc.mapping.tree.TinyMappingFactory;
+import net.fabricmc.mapping.tree.TinyTree;
+import net.fabricmc.mapping.util.EntryTriple;
 
 //Taken from loom
 public class MappingsStore {
@@ -55,6 +55,14 @@ public class MappingsStore {
 			for (MethodDef methodDef : classDef.getMethods()) {
 				methods.put(new EntryTriple(className, methodDef.getName(namespace), methodDef.getDescriptor(namespace)), methodDef);
 			}
+		}
+	}
+
+	private static TinyTree readMappings(Path input) {
+		try (BufferedReader reader = Files.newBufferedReader(input)) {
+			return TinyMappingFactory.loadWithDetection(reader);
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to read mappings", e);
 		}
 	}
 
@@ -92,7 +100,7 @@ public class MappingsStore {
 
 		return null;
 	}
-	
+
 	private MethodDef searchMethod(Function<String, Collection<String>> superGetters, EntryTriple methodEntry) {
 		String className = methodEntry.getOwner();
 		if (!classes.containsKey(className)) {
@@ -102,25 +110,17 @@ public class MappingsStore {
 		if (methods.containsKey(methodEntry)) {
 			return methods.get(methodEntry); // Nullable!
 		}
-		
+
 		for (String superName : superGetters.apply(className)) {
-			EntryTriple triple = new EntryTriple(superName, methodEntry.getName(), methodEntry.getDesc());
+			EntryTriple triple = new EntryTriple(superName, methodEntry.getName(), methodEntry.getDescriptor());
 			MethodDef ret = searchMethod(superGetters, triple);
 			if (ret != null) {
 				methods.put(triple, ret);
 				return ret;
 			}
 		}
-		
+
 		methods.put(methodEntry, null);
 		return null;
-	}
-
-	private static TinyTree readMappings(Path input) {
-		try (BufferedReader reader = Files.newBufferedReader(input)) {
-			return TinyMappingFactory.loadWithDetection(reader);
-		} catch (IOException e) {
-			throw new RuntimeException("Failed to read mappings", e);
-		}
 	}
 }

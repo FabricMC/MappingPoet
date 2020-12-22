@@ -21,6 +21,12 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
+enum StupidEnum {
+	FIRST,
+	@TestAnno
+	SECOND;
+}
+
 // signature <A::Ljava/lang/Comparable<-TA;>;>Ljava/lang/Object;
 public class TestOuter<A extends Comparable<? super A>> {
 
@@ -28,7 +34,72 @@ public class TestOuter<A extends Comparable<? super A>> {
 	class Inner<B extends Comparator<? super A>, C extends ClassLoader & AutoCloseable> {
 		// signature <D::Ljava/util/function/UnaryOperator<Ljava/util/Map<[[ILjava/util/function/BiFunction<TB;TA;TC;>;>;>;>Ljava/lang/Object;
 		class ExtraInner<D extends UnaryOperator<Map<int[][], BiFunction<B, A, C>>>> {
-			
+
+			ExtraInner(Inner<B, C>Inner.this) {
+				// constructor receiver example. Notice 'this' cannot receive parameter annos
+			}
+
+			void work(Inner<B, @TestAnno("on C") C>.@TestAnno("on extra inner") ExtraInner<D>this, Inner<@TestAnno("pig") B, C> @TestAnno("lion") [][] @TestAnno("rat") [] arr) {
+
+			}
+
+			void work2(Inner<@TestAnno("on B") B, C>.ExtraInner<D>this) {
+			}
+		}
+	}
+}
+
+class Outer {
+	void eat(@BorkAnno @TestAnno MiddleTwo.InnerThree<Integer> apple) {
+	}
+
+	void eat(@BorkAnno MiddleStatic.@TestAnno InnerStatic apple) {
+	}
+
+	static class MiddleStatic<T> {
+		static class InnerStatic {
+		}
+
+		class Inner<U> {
+		}
+	}
+
+	class MiddleTwo {
+		class InnerThree<E> {
+		}
+	}
+}
+
+class OuterTwo<T> {
+	static class InnerOne<G> {
+		class InnerTwo {
+			InnerTwo(InnerOne<G>net.fabricmc.mappingpoet.OuterTwo.InnerOne.this) {
+
+			}
+
+			void called(InnerTwo this, InnerTwo other) {
+			}
+
+			class NestedThree<W> {
+				void work(NestedThree<W>this, NestedThree<W> other) {
+				}
+			}
+		}
+	}
+
+	class InnerTwo {
+		class NestedThree<W> {
+			void workSelf(@TestAnno("on myself!")NestedThree<@TestAnno("on my W") W>this) {
+			}
+
+			void workSelf1(NestedThree<@TestAnno("on my W only") W>this) {
+			}
+
+			void workSelf2(@TestAnno("on myself only")NestedThree<W>this) {
+			}
+
+			void work(@TestAnno("on myself!")NestedThree<@TestAnno("on my W") W>this, NestedThree<@TestAnno("on their W") W> other) {
+			}
 		}
 	}
 }

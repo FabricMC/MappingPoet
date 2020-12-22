@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'maven-publish'
+    id("org.cadixdev.licenser") version "0.5.0"
 }
 
 group 'net.fabricmc'
@@ -15,38 +16,79 @@ repositories {
     mavenCentral()
     maven {
         name = 'Fabric'
-        url = 'http://maven.modmuss50.me/'
+        url = 'https://maven.modmuss50.me/'
     }
 }
 
 dependencies {
-    compile 'com.squareup:javapoet:1.12.1'
-    compile 'net.fabricmc:tiny-mappings-parser:0.2.2.14'
+    implementation 'com.squareup:javapoet:1.13.0'
+    implementation 'net.fabricmc:tiny-mappings-parser:0.3.0+build.17'
     runtimeOnly 'com.google.guava:guava:28.2-jre'
 
-    compile 'org.ow2.asm:asm:8.0'
-    compile 'org.ow2.asm:asm-analysis:8.0'
-    compile 'org.ow2.asm:asm-commons:8.0'
-    compile 'org.ow2.asm:asm-tree:8.0'
-    compile 'org.ow2.asm:asm-util:8.0'
+    implementation 'org.ow2.asm:asm:9.0'
+    implementation 'org.ow2.asm:asm-analysis:9.0'
+    implementation 'org.ow2.asm:asm-commons:9.0'
+    implementation 'org.ow2.asm:asm-tree:9.0'
+    implementation 'org.ow2.asm:asm-util:9.0'
 
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.1.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.1.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+}
+
+java {
+    withSourcesJar()
 }
 
 test {
     useJUnitPlatform()
 }
 
+tasks.withType(Jar) {
+    from("LICENSE") {
+        rename { "${it}_${project.archivesBaseName}" }
+    }
+}
+
 jar {
     manifest {
         attributes 'Implementation-Title': 'MappingPoet',
-                'Implementation-Version': version,
+                'Implementation-Version': archiveVersion,
                 'Main-Class': "net.fabricmc.mappingpoet.Main"
     }
 }
 
-apply from: 'https://github.com/FabricMC/fabric-docs/raw/master/gradle/license.gradle'
+task testJar(type: Jar) {
+    archiveClassifier.set 'test'
+    from sourceSets.test.output
+}
+
+def testCodeOutputDir = "build/testout"
+
+task poetTestCode(type: JavaExec, dependsOn: testJar) {
+    classpath sourceSets.main.runtimeClasspath + sourceSets.test.output
+    outputs.dir testCodeOutputDir
+    jvmArgs "-Xmx6G", "-XX:+ShowCodeDetailsInExceptionMessages"
+    args "src/test/resources/dummy.tiny", testJar.archiveFile.get(), testCodeOutputDir
+    main "net.fabricmc.mappingpoet.Main"
+}
+
+task poetTestDocGen(type: Javadoc, dependsOn: poetTestCode) {
+    destinationDir = file("build/testdoc")
+    source = testCodeOutputDir
+    classpath = sourceSets.test.runtimeClasspath + sourceSets.test.output
+    options {
+        memberLevel = JavadocMemberLevel.PRIVATE
+        encoding = "UTF-8"
+        links(
+                "https://docs.oracle.com/en/java/javase/15/docs/api"
+        )
+    }
+}
+
+license {
+    header file("HEADER")
+    include '**/*.java'
+}
 
 publishing {
     publications {
