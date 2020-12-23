@@ -1,12 +1,12 @@
 plugins {
     id 'java'
+    id 'java-library'
     id 'maven-publish'
+    id("org.cadixdev.licenser") version "0.5.0"
 }
 
 group 'net.fabricmc'
-version '0.1.0'
-
-sourceCompatibility = 1.8
+version '0.2.0'
 
 def ENV = System.getenv()
 version = version + "+" + (ENV.BUILD_NUMBER ? ("build." + ENV.BUILD_NUMBER) : "local")
@@ -15,38 +15,54 @@ repositories {
     mavenCentral()
     maven {
         name = 'Fabric'
-        url = 'http://maven.modmuss50.me/'
+        url = 'https://maven.modmuss50.me/'
     }
 }
 
 dependencies {
-    compile 'com.squareup:javapoet:1.12.1'
-    compile 'net.fabricmc:tiny-mappings-parser:0.2.2.14'
+    implementation 'com.squareup:javapoet:1.13.0'
+    implementation 'net.fabricmc:tiny-mappings-parser:0.3.0+build.17'
     runtimeOnly 'com.google.guava:guava:28.2-jre'
 
-    compile 'org.ow2.asm:asm:8.0'
-    compile 'org.ow2.asm:asm-analysis:8.0'
-    compile 'org.ow2.asm:asm-commons:8.0'
-    compile 'org.ow2.asm:asm-tree:8.0'
-    compile 'org.ow2.asm:asm-util:8.0'
+    implementation 'org.ow2.asm:asm:9.0'
+    implementation 'org.ow2.asm:asm-analysis:9.0'
+    implementation 'org.ow2.asm:asm-commons:9.0'
+    implementation 'org.ow2.asm:asm-tree:9.0'
+    implementation 'org.ow2.asm:asm-util:9.0'
 
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.1.0'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.1.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
+}
+
+java {
+    withSourcesJar()
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(11))
+    }
 }
 
 test {
     useJUnitPlatform()
 }
 
+tasks.withType(Jar) {
+    from("LICENSE") {
+        rename { "${it}_${project.archivesBaseName}" }
+    }
+}
+
 jar {
     manifest {
         attributes 'Implementation-Title': 'MappingPoet',
-                'Implementation-Version': version,
+                'Implementation-Version': archiveVersion,
                 'Main-Class': "net.fabricmc.mappingpoet.Main"
     }
 }
 
-apply from: 'https://github.com/FabricMC/fabric-docs/raw/master/gradle/license.gradle'
+license {
+    header file("HEADER")
+    include '**/*.java'
+}
 
 publishing {
     publications {
