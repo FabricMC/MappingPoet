@@ -266,10 +266,7 @@ public class ClassBuilder {
 	}
 
 	private void addJavaDoc() {
-		String javadoc = mappings.getClassDoc(classNode.name);
-		if (javadoc != null) {
-			builder.addJavadoc(javadoc);
-		}
+		mappings.addClassDoc(builder::addJavadoc, classNode.name);
 	}
 
 	public void addInnerClass(ClassBuilder classBuilder) {

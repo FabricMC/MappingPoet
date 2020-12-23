@@ -53,7 +53,7 @@ public class Main {
 
 	public static void main(String[] args) {
 		if (args.length != 3 && args.length != 4) {
-			System.out.println("<mappings> <inputJar> <outputDir> <librariesDir>");
+			System.out.println("<mappings> <inputJar> <outputDir> [<librariesDir>]");
 			return;
 		}
 		Path mappings = Paths.get(args[0]);

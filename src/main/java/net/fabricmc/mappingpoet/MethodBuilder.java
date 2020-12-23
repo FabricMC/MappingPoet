@@ -62,7 +62,7 @@ public class MethodBuilder {
 	private final int formalParamStartIndex;
 	private final ClassStaticContext context;
 	private final String receiverSignature;
-	private TypeAnnotationMapping typeAnnotations;
+	private final TypeAnnotationMapping typeAnnotations;
 
 	private MethodSignature signature;
 
@@ -305,10 +305,7 @@ public class MethodBuilder {
 	}
 
 	private void addJavaDoc() {
-		String javaDoc = mappings.getMethodDoc(superGetter, new EntryTriple(classNode.name, methodNode.name, methodNode.desc));
-		if (javaDoc != null) {
-			builder.addJavadoc(javaDoc);
-		}
+		mappings.addMethodDoc(builder::addJavadoc, superGetter, new EntryTriple(classNode.name, methodNode.name, methodNode.desc));
 	}
 
 	public MethodSpec build() {

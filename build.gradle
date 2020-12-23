@@ -1,13 +1,12 @@
 plugins {
     id 'java'
+    id 'java-library'
     id 'maven-publish'
     id("org.cadixdev.licenser") version "0.5.0"
 }
 
 group 'net.fabricmc'
 version '0.1.0'
-
-sourceCompatibility = 1.8
 
 def ENV = System.getenv()
 version = version + "+" + (ENV.BUILD_NUMBER ? ("build." + ENV.BUILD_NUMBER) : "local")
@@ -37,6 +36,9 @@ dependencies {
 
 java {
     withSourcesJar()
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(11))
+    }
 }
 
 test {
@@ -54,34 +56,6 @@ jar {
         attributes 'Implementation-Title': 'MappingPoet',
                 'Implementation-Version': archiveVersion,
                 'Main-Class': "net.fabricmc.mappingpoet.Main"
-    }
-}
-
-task testJar(type: Jar) {
-    archiveClassifier.set 'test'
-    from sourceSets.test.output
-}
-
-def testCodeOutputDir = "build/testout"
-
-task poetTestCode(type: JavaExec, dependsOn: testJar) {
-    classpath sourceSets.main.runtimeClasspath + sourceSets.test.output
-    outputs.dir testCodeOutputDir
-    jvmArgs "-Xmx6G", "-XX:+ShowCodeDetailsInExceptionMessages"
-    args "src/test/resources/dummy.tiny", testJar.archiveFile.get(), testCodeOutputDir
-    main "net.fabricmc.mappingpoet.Main"
-}
-
-task poetTestDocGen(type: Javadoc, dependsOn: poetTestCode) {
-    destinationDir = file("build/testdoc")
-    source = testCodeOutputDir
-    classpath = sourceSets.test.runtimeClasspath + sourceSets.test.output
-    options {
-        memberLevel = JavadocMemberLevel.PRIVATE
-        encoding = "UTF-8"
-        links(
-                "https://docs.oracle.com/en/java/javase/15/docs/api"
-        )
     }
 }
 

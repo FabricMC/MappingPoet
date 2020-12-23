@@ -23,11 +23,14 @@ import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 import net.fabricmc.mapping.tree.ClassDef;
 import net.fabricmc.mapping.tree.FieldDef;
+import net.fabricmc.mapping.tree.Mapped;
 import net.fabricmc.mapping.tree.MethodDef;
 import net.fabricmc.mapping.tree.TinyMappingFactory;
 import net.fabricmc.mapping.tree.TinyTree;
@@ -37,12 +40,15 @@ import net.fabricmc.mapping.util.EntryTriple;
 public class MappingsStore {
 	private final Map<String, ClassDef> classes = new HashMap<>();
 	private final Map<EntryTriple, FieldDef> fields = new HashMap<>();
-	private final Map<EntryTriple, MethodDef> methods = new HashMap<>();
+	private final Map<EntryTriple, Map.Entry<String, MethodDef>> methods = new HashMap<>();
 
 	private final String namespace = "named";
+	private final List<String> namespaces;
 
 	public MappingsStore(Path tinyFile) {
 		final TinyTree mappings = readMappings(tinyFile);
+
+		namespaces = mappings.getMetadata().getNamespaces();
 
 		for (ClassDef classDef : mappings.getClasses()) {
 			final String className = classDef.getName(namespace);
@@ -53,7 +59,7 @@ public class MappingsStore {
 			}
 
 			for (MethodDef methodDef : classDef.getMethods()) {
-				methods.put(new EntryTriple(className, methodDef.getName(namespace), methodDef.getDescriptor(namespace)), methodDef);
+				methods.put(new EntryTriple(className, methodDef.getName(namespace), methodDef.getDescriptor(namespace)), new AbstractMap.SimpleImmutableEntry<>(className, methodDef));
 			}
 		}
 	}
@@ -66,19 +72,58 @@ public class MappingsStore {
 		}
 	}
 
+	@Deprecated
 	public String getClassDoc(String className) {
 		ClassDef classDef = classes.get(className);
 		return classDef != null ? classDef.getComment() : null;
 	}
 
+	private void addDoc(Mapped element, BiConsumer<String, Object[]> addJavadoc) {
+		String doc = element.getComment();
+		if (doc != null) {
+			addJavadoc.accept(doc, new Object[0]);
+		}
+	}
+
+	public void addClassDoc(BiConsumer<String, Object[]> addJavadoc, String className) {
+		ClassDef classDef = classes.get(className);
+		if (classDef == null) {
+			return;
+		}
+		addDoc(classDef, addJavadoc);
+		addJavadoc.accept("\n", new Object[0]);
+		for (String namespace : namespaces) {
+			String transformedName = classDef.getName(namespace);
+			addJavadoc.accept("@mapping {@literal $L:$L}\n", new Object[] {namespace, transformedName});
+		}
+	}
+
+	@Deprecated
 	public String getFieldDoc(EntryTriple fieldEntry) {
 		FieldDef fieldDef = fields.get(fieldEntry);
 		return fieldDef != null ? fieldDef.getComment() : null;
 	}
 
+	public void addFieldDoc(BiConsumer<String, Object[]> addJavadoc, EntryTriple fieldEntry) {
+		FieldDef fieldDef = fields.get(fieldEntry);
+		if (fieldDef == null) {
+			return;
+		}
+
+		addDoc(fieldDef, addJavadoc);
+		ClassDef owner = classes.get(fieldEntry.getOwner());
+		addJavadoc.accept("\n", new Object[0]);
+		for (String namespace : namespaces) {
+			String transformedName = fieldDef.getName(namespace);
+			String mixinForm = "L" + owner.getName(namespace) + ";" + transformedName + ":" + fieldDef.getDescriptor(namespace);
+			addJavadoc.accept("@mapping {@literal $L:$L:$L}\n", new Object[] {namespace, transformedName, mixinForm});
+		}
+	}
+
 	public Map.Entry<String, String> getParamNameAndDoc(Function<String, Collection<String>> superGetters, EntryTriple methodEntry, int index) {
-		MethodDef methodDef = searchMethod(superGetters, methodEntry);
-		if (methodDef != null) {
+		Map.Entry<String, MethodDef> found = searchMethod(superGetters, methodEntry);
+		if (found != null) {
+			MethodDef methodDef = found.getValue();
 			if (methodDef.getParameters().isEmpty()) {
 				return null;
 			}
@@ -91,17 +136,35 @@ public class MappingsStore {
 		return null;
 	}
 
+	@Deprecated
 	public String getMethodDoc(Function<String, Collection<String>> superGetters, EntryTriple methodEntry) {
-		MethodDef methodDef = searchMethod(superGetters, methodEntry);
+		Map.Entry<String, MethodDef> methodDef = searchMethod(superGetters, methodEntry);
 
 		if (methodDef != null) {
-			return methodDef.getComment(); // comment doc handled separately by javapoet
+			return methodDef.getValue().getComment(); // comment doc handled separately by javapoet
 		}
 
 		return null;
 	}
 
-	private MethodDef searchMethod(Function<String, Collection<String>> superGetters, EntryTriple methodEntry) {
+	public void addMethodDoc(BiConsumer<String, Object[]> addJavadoc, Function<String, Collection<String>> superGetters, EntryTriple methodEntry) {
+		Map.Entry<String, MethodDef> found = searchMethod(superGetters, methodEntry);
+		if (found == null) {
+			return;
+		}
+
+		MethodDef methodDef = found.getValue();
+		addDoc(methodDef, addJavadoc);
+		ClassDef owner = classes.get(found.getKey());
+		addJavadoc.accept("\n", new Object[0]);
+		for (String namespace : namespaces) {
+			String transformedName = methodDef.getName(namespace);
+			String mixinForm = "L" + owner.getName(namespace) + ";" + transformedName + methodDef.getDescriptor(namespace);
+			addJavadoc.accept("@mapping {@literal $L:$L:$L}\n", new Object[] {namespace, transformedName, mixinForm});
+		}
+	}
+
+	private Map.Entry<String, MethodDef> searchMethod(Function<String, Collection<String>> superGetters, EntryTriple methodEntry) {
 		String className = methodEntry.getOwner();
 		if (!classes.containsKey(className)) {
 			return null;
@@ -113,7 +176,7 @@ public class MappingsStore {
 
 		for (String superName : superGetters.apply(className)) {
 			EntryTriple triple = new EntryTriple(superName, methodEntry.getName(), methodEntry.getDescriptor());
-			MethodDef ret = searchMethod(superGetters, triple);
+			Map.Entry<String, MethodDef> ret = searchMethod(superGetters, triple);
 			if (ret != null) {
 				methods.put(triple, ret);
 				return ret;

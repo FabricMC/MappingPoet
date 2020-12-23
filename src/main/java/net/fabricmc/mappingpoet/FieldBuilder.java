@@ -69,10 +69,7 @@ public class FieldBuilder {
 	}
 
 	static void addFieldJavaDoc(TypeSpec.Builder enumBuilder, MappingsStore mappings, ClassNode classNode, FieldNode fieldNode) {
-		String javaDoc = mappings.getFieldDoc(new EntryTriple(classNode.name, fieldNode.name, fieldNode.desc));
-		if (javaDoc != null) {
-			enumBuilder.addJavadoc(javaDoc);
-		}
+		mappings.addFieldDoc(enumBuilder::addJavadoc, new EntryTriple(classNode.name, fieldNode.name, fieldNode.desc));
 	}
 
 	public static AnnotationSpec parseAnnotation(AnnotationNode annotation) {
@@ -421,10 +418,7 @@ public class FieldBuilder {
 	}
 
 	private void addJavaDoc() {
-		String javaDoc = mappings.getFieldDoc(new EntryTriple(classNode.name, fieldNode.name, fieldNode.desc));
-		if (javaDoc != null) {
-			builder.addJavadoc(javaDoc);
-		}
+		mappings.addFieldDoc(builder::addJavadoc, new EntryTriple(classNode.name, fieldNode.name, fieldNode.desc));
 	}
 
 	private void addDirectAnnotations() {

@@ -176,6 +176,7 @@ public final class PoetClassMethodSignatureVisitor extends SignatureVisitor {
 
 	@Override
 	public SignatureVisitor visitReturnType() {
+		collectGenerics(); // they may skip visiting params, rip!
 		collectParam();
 
 		return pendingSlot = new PoetTypeSignatureWriter(mapping.getBank(TypeReference.newTypeReference(TypeReference.METHOD_RETURN)), context);
