@@ -82,7 +82,7 @@ public final class MappingTaglet implements Taglet {
 			builder.append(String.format("<td align=\"center\">%s</td>\n", escaped(ans[0])));
 			final int bound = typeDecl ? 2 : 3;
 			for (int i = 1; i < bound; i++) {
-				builder.append(String.format("<td align=\"center\"><span class=\"copyable\" title=\"Click to copy\"><code class=\"literal\">%s</code></span></td>\n", escaped(ans[i])));
+				builder.append(String.format("<td align=\"center\"><span class=\"copyable\"><code class=\"literal\">%s</code></span></td>\n", escaped(ans[i])));
 			}
 			builder.append("</tr>\n");
 		}
