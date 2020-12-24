@@ -67,7 +67,7 @@ public final class MappingTaglet implements Taglet {
 		builder.append("<table class=\"memberSummary\" summary=\"Mapping data\">\n");
 		builder.append("<thead>\n");
 		builder.append("<th class=\"colFirst\">Namespace</th>\n");
-		builder.append("<th class=\""+(typeDecl ? "colSecond" : "colLast")+"\">Name</th>\n");
+		builder.append("<th class=\"" + (typeDecl ? "colSecond" : "colLast") + "\">Name</th>\n");
 		if (!typeDecl) {
 			builder.append("<th class=\"colLast\">Mixin selector</th>\n");
 		}
