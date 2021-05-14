@@ -118,9 +118,9 @@ public class SignaturesTest {
 		Assertions.assertEquals("java.util.function.UnaryOperator<java.util.Map<int[][], java.util.function.BiFunction<B, A, C>>>", dBound.getValue().toString());
 
 		ClassSignature parsed = Signatures.parseClassSignature(classSig);
-		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("D")), parsed.generics);
-		Assertions.assertEquals(ClassName.OBJECT, parsed.superclass);
-		Assertions.assertIterableEquals(Collections.emptyList(), parsed.superinterfaces);
+		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("D")), parsed.generics());
+		Assertions.assertEquals(ClassName.OBJECT, parsed.superclass());
+		Assertions.assertIterableEquals(Collections.emptyList(), parsed.superinterfaces());
 	}
 
 	@Test
@@ -131,9 +131,9 @@ public class SignaturesTest {
 		PoetClassMethodSignatureVisitor visitor = new PoetClassMethodSignatureVisitor(TypeAnnotationMapping.EMPTY, s -> false, true);
 		new SignatureReader(classSig).accept(visitor);
 		ClassSignature parsed = visitor.collectClass();
-		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("D")), parsed.generics);
-		Assertions.assertEquals(ClassName.OBJECT, parsed.superclass);
-		Assertions.assertIterableEquals(Collections.emptyList(), parsed.superinterfaces);
+		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("D")), parsed.generics());
+		Assertions.assertEquals(ClassName.OBJECT, parsed.superclass());
+		Assertions.assertIterableEquals(Collections.emptyList(), parsed.superinterfaces());
 	}
 
 	@Test
@@ -141,10 +141,10 @@ public class SignaturesTest {
 		// signature <T:Ljava/lang/Object;>(Ljava/util/function/IntFunction<[TT;>;)[TT;
 		String methodSignature = "<T:Ljava/lang/Object;>(Ljava/util/function/IntFunction<[TT;>;)[TT;";
 		MethodSignature parsed = Signatures.parseMethodSignature(methodSignature);
-		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("T")), parsed.generics);
-		Assertions.assertEquals(ArrayTypeName.of(TypeVariableName.get("T")), parsed.result);
-		Assertions.assertIterableEquals(Collections.emptyList(), parsed.thrown);
-		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(ClassName.get(IntFunction.class), ArrayTypeName.of(TypeVariableName.get("T")))), parsed.parameters);
+		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("T")), parsed.generics());
+		Assertions.assertEquals(ArrayTypeName.of(TypeVariableName.get("T")), parsed.result());
+		Assertions.assertIterableEquals(Collections.emptyList(), parsed.thrown());
+		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(ClassName.get(IntFunction.class), ArrayTypeName.of(TypeVariableName.get("T")))), parsed.parameters());
 	}
 
 	@Test
@@ -152,10 +152,10 @@ public class SignaturesTest {
 		// signature <T:Ljava/lang/Object;>([TT;)[TT;
 		String methodSignature = "<T:Ljava/lang/Object;>([TT;)[TT;";
 		MethodSignature parsed = Signatures.parseMethodSignature(methodSignature);
-		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("T")), parsed.generics);
-		Assertions.assertEquals(ArrayTypeName.of(TypeVariableName.get("T")), parsed.result);
-		Assertions.assertIterableEquals(Collections.emptyList(), parsed.thrown);
-		Assertions.assertIterableEquals(Collections.singleton(ArrayTypeName.of(TypeVariableName.get("T"))), parsed.parameters);
+		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("T")), parsed.generics());
+		Assertions.assertEquals(ArrayTypeName.of(TypeVariableName.get("T")), parsed.result());
+		Assertions.assertIterableEquals(Collections.emptyList(), parsed.thrown());
+		Assertions.assertIterableEquals(Collections.singleton(ArrayTypeName.of(TypeVariableName.get("T"))), parsed.parameters());
 	}
 
 	@Test
@@ -165,10 +165,10 @@ public class SignaturesTest {
 		PoetClassMethodSignatureVisitor visitor = new PoetClassMethodSignatureVisitor(TypeAnnotationMapping.EMPTY, s -> false, false);
 		new SignatureReader(methodSignature).accept(visitor);
 		MethodSignature parsed = visitor.collectMethod();
-		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("T")), parsed.generics);
-		Assertions.assertEquals(ArrayTypeName.of(TypeVariableName.get("T")), parsed.result);
-		Assertions.assertIterableEquals(Collections.emptyList(), parsed.thrown);
-		Assertions.assertIterableEquals(Collections.singleton(ArrayTypeName.of(TypeVariableName.get("T"))), parsed.parameters);
+		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("T")), parsed.generics());
+		Assertions.assertEquals(ArrayTypeName.of(TypeVariableName.get("T")), parsed.result());
+		Assertions.assertIterableEquals(Collections.emptyList(), parsed.thrown());
+		Assertions.assertIterableEquals(Collections.singleton(ArrayTypeName.of(TypeVariableName.get("T"))), parsed.parameters());
 	}
 
 	@Test
@@ -176,12 +176,12 @@ public class SignaturesTest {
 		// signature (Ljava/util/function/UnaryOperator<Lcom/squareup/javapoet/TypeName;>;)V
 		String methodSignature = "(Ljava/util/function/UnaryOperator<Lcom/squareup/javapoet/TypeName;>;)V";
 		MethodSignature parsed = Signatures.parseMethodSignature(methodSignature);
-		Assertions.assertTrue(parsed.generics.isEmpty());
-		Assertions.assertEquals(TypeName.VOID, parsed.result);
-		Assertions.assertIterableEquals(Collections.emptyList(), parsed.thrown);
+		Assertions.assertTrue(parsed.generics().isEmpty());
+		Assertions.assertEquals(TypeName.VOID, parsed.result());
+		Assertions.assertIterableEquals(Collections.emptyList(), parsed.thrown());
 		ClassName unaryOperatorClass = ClassName.get(UnaryOperator.class);
 		ClassName typeNameClass = ClassName.get(TypeName.class);
-		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(unaryOperatorClass, typeNameClass)), parsed.parameters);
+		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(unaryOperatorClass, typeNameClass)), parsed.parameters());
 	}
 
 	@Test
@@ -191,12 +191,12 @@ public class SignaturesTest {
 		PoetClassMethodSignatureVisitor visitor = new PoetClassMethodSignatureVisitor(TypeAnnotationMapping.EMPTY, s -> false, false);
 		new SignatureReader(methodSignature).accept(visitor);
 		MethodSignature parsed = visitor.collectMethod();
-		Assertions.assertTrue(parsed.generics.isEmpty());
-		Assertions.assertEquals(TypeName.VOID, parsed.result);
-		Assertions.assertIterableEquals(Collections.emptyList(), parsed.thrown);
+		Assertions.assertTrue(parsed.generics().isEmpty());
+		Assertions.assertEquals(TypeName.VOID, parsed.result());
+		Assertions.assertIterableEquals(Collections.emptyList(), parsed.thrown());
 		ClassName unaryOperatorClass = ClassName.get(UnaryOperator.class);
 		ClassName typeNameClass = ClassName.get(TypeName.class);
-		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(unaryOperatorClass, typeNameClass)), parsed.parameters);
+		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(unaryOperatorClass, typeNameClass)), parsed.parameters());
 	}
 
 	@Test
@@ -204,11 +204,11 @@ public class SignaturesTest {
 		// signature <E:Ljava/lang/Throwable;>(Lnet/fabricmc/mappingpoet/Signatures$HeadChecker<TE;>;)V^TE;
 		String raw = "<E:Ljava/lang/Throwable;>(Lnet/fabricmc/mappingpoet/Signatures$HeadChecker<TE;>;)V^TE;";
 		MethodSignature parsed = Signatures.parseMethodSignature(raw);
-		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("E", ClassName.get(Throwable.class))), parsed.generics);
+		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("E", ClassName.get(Throwable.class))), parsed.generics());
 		ClassName headCheckerClass = ClassName.get(Signatures.class).nestedClass("HeadChecker");
-		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(headCheckerClass, TypeVariableName.get("E"))), parsed.parameters);
-		Assertions.assertEquals(TypeName.VOID, parsed.result);
-		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("E")), parsed.thrown);
+		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(headCheckerClass, TypeVariableName.get("E"))), parsed.parameters());
+		Assertions.assertEquals(TypeName.VOID, parsed.result());
+		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("E")), parsed.thrown());
 	}
 
 	@Test
@@ -218,11 +218,11 @@ public class SignaturesTest {
 		PoetClassMethodSignatureVisitor visitor = new PoetClassMethodSignatureVisitor(TypeAnnotationMapping.EMPTY, s -> false, false);
 		new SignatureReader(raw).accept(visitor);
 		MethodSignature parsed = visitor.collectMethod();
-		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("E", ClassName.get(Throwable.class))), parsed.generics);
+		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("E", ClassName.get(Throwable.class))), parsed.generics());
 		ClassName headCheckerClass = ClassName.get(Signatures.class).nestedClass("HeadChecker");
-		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(headCheckerClass, TypeVariableName.get("E"))), parsed.parameters);
-		Assertions.assertEquals(TypeName.VOID, parsed.result);
-		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("E")), parsed.thrown);
+		Assertions.assertIterableEquals(Collections.singleton(ParameterizedTypeName.get(headCheckerClass, TypeVariableName.get("E"))), parsed.parameters());
+		Assertions.assertEquals(TypeName.VOID, parsed.result());
+		Assertions.assertIterableEquals(Collections.singleton(TypeVariableName.get("E")), parsed.thrown());
 	}
 
 	@Test
