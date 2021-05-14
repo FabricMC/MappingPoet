@@ -4,12 +4,11 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     container:
-      image: openjdk:11-jdk
+      image: openjdk:16-jdk
       options: --user root
     steps:
       - uses: actions/checkout@v1
       - uses: gradle/wrapper-validation-action@v1
-      - run: chmod +x ./gradlew
       - run: ./gradlew checkVersion build publish --stacktrace
         env:
           MAVEN_URL: ${{ secrets.MAVEN_URL }}
