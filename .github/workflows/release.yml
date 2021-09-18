@@ -4,7 +4,7 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     container:
-      image: openjdk:16-jdk
+      image: openjdk:17-jdk
       options: --user root
     steps:
       - uses: actions/checkout@v1
@@ -14,3 +14,5 @@ jobs:
           MAVEN_URL: ${{ secrets.MAVEN_URL }}
           MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}

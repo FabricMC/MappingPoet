@@ -1,8 +1,7 @@
 plugins {
     id 'java'
-    id 'java-library'
     id 'maven-publish'
-    id("org.cadixdev.licenser") version "0.5.0"
+    id 'org.cadixdev.licenser' version '0.6.1'
 }
 
 group 'net.fabricmc'
@@ -17,18 +16,29 @@ repositories {
         name = 'Fabric'
         url = 'https://maven.modmuss50.me/'
     }
+    maven {
+        name = "GitHub"
+        url = uri("https://maven.pkg.github.com/liachmodded/javapoet")
+        credentials {
+            // any user can generate an access token at https://github.com/settings/tokens as password
+            // just need the read:packages permission
+            username = findProperty('github_user') ?: ENV.GITHUB_ACTOR
+            password = findProperty('github_read_key') ?: ENV.GITHUB_TOKEN
+        }
+    }
 }
 
 dependencies {
-    implementation 'com.squareup:javapoet:1.13.0'
+    //implementation 'com.squareup:javapoet:1.13.0'
+    implementation 'com.github.liachmodded:javapoet:0.0.3'
     implementation 'net.fabricmc:tiny-mappings-parser:0.3.0+build.17'
     runtimeOnly 'com.google.guava:guava:30.1.1-jre'
 
-    implementation 'org.ow2.asm:asm:9.1'
-    implementation 'org.ow2.asm:asm-analysis:9.1'
-    implementation 'org.ow2.asm:asm-commons:9.1'
-    implementation 'org.ow2.asm:asm-tree:9.1'
-    implementation 'org.ow2.asm:asm-util:9.1'
+    implementation 'org.ow2.asm:asm:9.2'
+    implementation 'org.ow2.asm:asm-analysis:9.2'
+    implementation 'org.ow2.asm:asm-commons:9.2'
+    implementation 'org.ow2.asm:asm-tree:9.2'
+    implementation 'org.ow2.asm:asm-util:9.2'
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
@@ -38,8 +48,9 @@ java {
     withSourcesJar()
 }
 
-compileJava {
-    sourceCompatibility = targetCompatibility = JavaVersion.VERSION_16
+tasks.withType(JavaCompile) {
+    options.release = 17
+    options.encoding = "UTF-8"
 }
 
 test {

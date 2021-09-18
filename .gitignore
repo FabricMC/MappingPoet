@@ -8,7 +8,6 @@
 !/.gitignore
 !/.editorconfig
 !/build.gradle
-!/gradle.properties
 !/gradlew
 !/gradlew.bat
 !/settings.gradle
