@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'net.fabricmc'
-version '0.2.8'
+version '0.2.9'
 
 def ENV = System.getenv()
 version = version + (ENV.GITHUB_ACTIONS ? "" : "+local")
@@ -28,9 +28,17 @@ repositories {
     }
 }
 
+configurations {
+    ship
+    runtimeClasspath.extendsFrom ship
+    compileOnly.extendsFrom ship
+    testRuntimeClasspath.extendsFrom ship
+    testCompileOnly.extendsFrom ship
+}
+
 dependencies {
     //implementation 'com.squareup:javapoet:1.13.0'
-    implementation 'com.github.liachmodded:javapoet:0.0.3'
+    ship 'com.github.liachmodded:javapoet:0.0.3'
     implementation 'net.fabricmc:tiny-mappings-parser:0.3.0+build.17'
     runtimeOnly 'com.google.guava:guava:30.1.1-jre'
 
@@ -64,6 +72,11 @@ tasks.withType(Jar) {
 }
 
 jar {
+    from {
+        configurations.ship.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
     manifest {
         attributes 'Implementation-Title': 'MappingPoet',
                 'Implementation-Version': archiveVersion,
