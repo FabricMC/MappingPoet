@@ -1,0 +1,7 @@
+<div class="deprecation-block"><span class="deprecated-label">Warning: This class is not a record at runtime!</span>
+<div class="deprecation-comment">Due to Proguard processing, This class is not a record at
+       runtime when inspected by reflection. In addition, if this record has any type parameter,
+       inspecting generic types through reflection may have unexpected results or throw exceptions.
+       See <a href="https://fabricmc.net/wiki/tutorial:reflection#records">
+       The Fabric Wiki</a> for more details.</div>
+</div>
