@@ -1,11 +1,11 @@
 plugins {
     id 'java'
     id 'maven-publish'
-    id 'org.cadixdev.licenser' version '0.6.1'
+    id 'com.diffplug.spotless' version '5.8.2'
 }
 
 group 'net.fabricmc'
-version '0.3.2'
+version '0.4.0'
 
 def ENV = System.getenv()
 version = version + (ENV.GITHUB_ACTIONS ? "" : "+local")
@@ -20,8 +20,7 @@ repositories {
 
 dependencies {
     implementation 'net.fabricmc:javapoet:0.1.0'
-    implementation 'net.fabricmc:tiny-mappings-parser:0.3.0+build.17'
-    runtimeOnly 'com.google.guava:guava:30.1.1-jre'
+    implementation 'net.fabricmc:mapping-io:0.4.0'
 
     implementation 'org.ow2.asm:asm:9.2'
     implementation 'org.ow2.asm:asm-analysis:9.2'
@@ -35,10 +34,10 @@ dependencies {
 
 java {
     withSourcesJar()
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
-
-sourceCompatibility = 17
-targetCompatibility = 17
 
 tasks.withType(JavaCompile) {
     options.release = 17
@@ -63,9 +62,12 @@ jar {
     }
 }
 
-license {
-    header file("HEADER")
-    include '**/*.java'
+import com.diffplug.spotless.LineEnding
+spotless {
+    lineEndings = LineEnding.UNIX
+    java {
+        licenseHeaderFile(file("HEADER")).yearSeparator(", ")
+    }
 }
 
 publishing {
