@@ -5,7 +5,7 @@ plugins {
 }
 
 group 'net.fabricmc'
-version '0.4.0'
+version '0.4.1'
 
 def ENV = System.getenv()
 version = version + (ENV.GITHUB_ACTIONS ? "" : "+local")
@@ -22,11 +22,11 @@ dependencies {
     implementation 'net.fabricmc:javapoet:0.1.0'
     implementation 'net.fabricmc:mapping-io:0.4.0'
 
-    implementation 'org.ow2.asm:asm:9.2'
-    implementation 'org.ow2.asm:asm-analysis:9.2'
-    implementation 'org.ow2.asm:asm-commons:9.2'
-    implementation 'org.ow2.asm:asm-tree:9.2'
-    implementation 'org.ow2.asm:asm-util:9.2'
+    implementation 'org.ow2.asm:asm:9.7'
+    implementation 'org.ow2.asm:asm-analysis:9.7'
+    implementation 'org.ow2.asm:asm-commons:9.7'
+    implementation 'org.ow2.asm:asm-tree:9.7'
+    implementation 'org.ow2.asm:asm-util:9.7'
 
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.1'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
