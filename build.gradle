@@ -20,7 +20,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'net.fabricmc:javapoet:0.1.0'
+    implementation 'net.fabricmc:javapoet:0.1.1'
     implementation 'net.fabricmc:mapping-io:0.4.0'
 
     implementation 'org.ow2.asm:asm:9.7'
