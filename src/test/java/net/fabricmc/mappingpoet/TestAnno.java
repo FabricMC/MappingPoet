@@ -23,7 +23,7 @@ import java.lang.annotation.Target;
 
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.TYPE_USE)
+@Target({ElementType.TYPE_USE, ElementType.FIELD})
 public @interface TestAnno {
 	String value() default "";
 }

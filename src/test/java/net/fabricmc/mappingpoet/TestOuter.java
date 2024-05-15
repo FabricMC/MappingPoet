@@ -72,7 +72,7 @@ class Outer {
 class OuterTwo<T> {
 	static class InnerOne<G> {
 		class InnerTwo {
-			InnerTwo(InnerOne<G>net.fabricmc.mappingpoet.OuterTwo.InnerOne.this) {
+			InnerTwo(InnerOne<G>InnerOne.this) {
 
 			}
 
