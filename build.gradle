@@ -1,11 +1,12 @@
 plugins {
     id 'java'
+    id 'eclipse'
     id 'maven-publish'
     id 'com.diffplug.spotless' version '5.8.2'
 }
 
 group 'net.fabricmc'
-version '0.4.1'
+version '0.4.2'
 
 def ENV = System.getenv()
 version = version + (ENV.GITHUB_ACTIONS ? "" : "+local")
@@ -19,7 +20,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'net.fabricmc:javapoet:0.1.0'
+    implementation 'net.fabricmc:javapoet:0.1.1'
     implementation 'net.fabricmc:mapping-io:0.4.0'
 
     implementation 'org.ow2.asm:asm:9.7'
