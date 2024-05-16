@@ -232,6 +232,11 @@ public class Main {
 	}
 
 	private static void writeClass(MappingsStore mappings, ClassNode classNode, Map<String, ClassBuilder> existingClasses, Environment environment) {
+		if ((classNode.access & Opcodes.ACC_SYNTHETIC) != 0) {
+			// Skip synthetic classes such as package-info
+			return;
+		}
+
 		// TODO make sure named jar has valid InnerClasses, use that info instead
 		String name = classNode.name;
 		{
